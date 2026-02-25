@@ -10,3 +10,5 @@ a no-show-up fee.
 - It should be fully configurable via Telegram, providing username and secrets through it.
 - Also, showing the current schedules and different classes I'm interested in. Saving preferences per username
 based on the gyms I'd like to go, classes I'm interested in and available times in the week.
+- I can see classes with 28 days in advance.
+- Up to 18 bookings (REALLY?)
