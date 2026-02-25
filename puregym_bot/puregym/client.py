@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import asyncio
 from datetime import datetime, timedelta
 
 import httpx
@@ -13,11 +16,13 @@ API_URL = "https://www.puregym.dk/api/"
 
 class PureGymClient:
     def __init__(self, username: str, password: SecretStr):
-        self.client = httpx.Client(follow_redirects=True)
-        self.login(username, password)
+        self.username = username
+        self.password = password
+        self.client = httpx.AsyncClient(follow_redirects=True)
+        self._login_lock = asyncio.Lock()
 
-    def login(self, username: str, password: SecretStr):
-        r = self.client.get(BASE_URL)
+    async def login(self) -> None:
+        r = await self.client.get(BASE_URL)
         soup = BeautifulSoup(r.text, "html.parser")
 
         form_build_id_input = soup.find("input", {"name": "form_build_id"})
@@ -27,29 +32,38 @@ class PureGymClient:
 
         form_build_id = form_build_id_input.get("value")
 
-        self.client.post(
+        await self.client.post(
             BASE_URL,
             data={
                 "form_build_id": form_build_id,
                 "form_id": "user_login_form",
-                "name": username,
-                "pass": password.get_secret_value(),
+                "name": self.username,
+                "pass": self.password.get_secret_value(),
                 "redirect_url": "",
                 "op": "Log ind",
             },
             timeout=10,
         )
 
-    def get_all_class_types(self) -> list[GymClassTypesGroup]:
-        r = self.client.get(f"{API_URL}get_activities")
-        return [GymClassTypesGroup.model_validate(c) for c in r.json()["classes"]]
+    async def _request_json(self, method: str, url: str, **kwargs):
+        r = await self.client.request(method, url, **kwargs)
+        if r.status_code in (401, 403) or "user_login_form" in r.text:
+            async with self._login_lock:
+                await self.login()
+            r = await self.client.request(method, url, **kwargs)
+        r.raise_for_status()
+        return r.json()
 
-    def get_all_centers(self) -> list[CenterGroup]:
-        r = self.client.get(f"{API_URL}get_activities")
-        return [CenterGroup.model_validate(c) for c in r.json()["centers"]]
+    async def get_all_class_types(self) -> list[GymClassTypesGroup]:
+        data = await self._request_json("GET", f"{API_URL}get_activities")
+        return [GymClassTypesGroup.model_validate(c) for c in data["classes"]]
 
-    def find_class_types_ids(self, class_names: list[str]) -> list[int]:
-        activities = self.get_all_class_types()
+    async def get_all_centers(self) -> list[CenterGroup]:
+        data = await self._request_json("GET", f"{API_URL}get_activities")
+        return [CenterGroup.model_validate(c) for c in data["centers"]]
+
+    async def find_class_types_ids(self, class_names: list[str]) -> list[int]:
+        activities = await self.get_all_class_types()
         class_ids = []
         for group in activities:
             for option in group.options:
@@ -62,8 +76,8 @@ class PureGymClient:
             )
         return class_ids
 
-    def find_centers_ids(self, center_names: list[str]) -> list[int]:
-        centers = self.get_all_centers()
+    async def find_centers_ids(self, center_names: list[str]) -> list[int]:
+        centers = await self.get_all_centers()
         center_ids = []
         for group in centers:
             for option in group.options:
@@ -76,11 +90,12 @@ class PureGymClient:
             )
         return center_ids
 
-    def get_available_classes(self) -> list[GymClass]:
-        class_ids = self.find_class_types_ids(config.INTERESTED_CLASSES)
-        center_ids = self.find_centers_ids(config.INTERESTED_CENTERS)
+    async def get_available_classes(self) -> list[GymClass]:
+        class_ids = await self.find_class_types_ids(config.INTERESTED_CLASSES)
+        center_ids = await self.find_centers_ids(config.INTERESTED_CENTERS)
 
-        r = self.client.get(
+        data = await self._request_json(
+            "GET",
             f"{API_URL}search_activities",
             params={
                 "classes[]": class_ids,
@@ -94,17 +109,18 @@ class PureGymClient:
 
         return [
             GymClass.model_validate({**item, "date": day["date"]})
-            for day in r.json()
+            for day in data
             for item in day["items"]
         ]
 
-    def get_booked_classes(self) -> list[GymClass]:
-        classes = self.get_available_classes()
+    async def get_booked_classes(self) -> list[GymClass]:
+        classes = await self.get_available_classes()
 
         return [c for c in classes if c.participationId is not None]
 
-    def book_class(self, gym_class: GymClass):
-        r = self.client.post(
+    async def book_class(self, gym_class: GymClass):
+        return await self._request_json(
+            "POST",
             f"{API_URL}book_activity",
             data={
                 "bookingId": gym_class.bookingId,
@@ -112,13 +128,15 @@ class PureGymClient:
                 "payment_type": gym_class.payment_type,
             },
         )
-        return r.json()
 
-    def unbook_class(self, gym_class: GymClass):
-        r = self.client.post(
+    async def unbook_class(self, gym_class: GymClass):
+        return await self._request_json(
+            "POST",
             f"{API_URL}unbook_activity",
             data={
                 "participationId": gym_class.participationId,
             },
         )
-        return r.json()
+
+    async def aclose(self) -> None:
+        await self.client.aclose()
