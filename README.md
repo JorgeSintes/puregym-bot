@@ -6,7 +6,7 @@ notifications via Telegram I can respond to.
 - I should be able to respond to that notification saying whether I want to keep that class or not.  If not,
 it will then unbook me and book the next class I'm interested in.
 - If I don't respond to the notification, it should unbook me before the closing time ends, to avoid paying
-a no-show-up fee.
+a no-show-up fee. That's 2 hours before the class time.
 - It should be fully configurable via Telegram, providing username and secrets through it.
 - Also, showing the current schedules and different classes I'm interested in. Saving preferences per username
 based on the gyms I'd like to go, classes I'm interested in and available times in the week.
