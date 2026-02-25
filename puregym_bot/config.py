@@ -24,5 +24,10 @@ class Config(BaseSettings):
     PUREGYM_USERNAME: Annotated[str, AfterValidator(valid_str)] = ""
     PUREGYM_PASSWORD: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
 
+    INTERESTED_CLASSES: list[str] = ["Bike Power", "Bike Standard"]
+    INTERESTED_CENTERS: list[str] = ["Kbh Ø., Århusgade", "Kbh Ø., Strandvejen"]
+    MAX_DAYS_IN_ADVANCE: int = 28
+    MAX_BOOKINGS: int = 18
+
 
 config = Config()
