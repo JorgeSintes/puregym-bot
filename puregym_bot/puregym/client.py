@@ -1,4 +1,5 @@
 import asyncio
+import time
 from datetime import datetime, timedelta
 
 import httpx
@@ -17,6 +18,8 @@ class PureGymClient:
         self.password = password
         self.client = httpx.AsyncClient(follow_redirects=True)
         self._login_lock = asyncio.Lock()
+        self._auth_checked_at: float | None = None
+        self._auth_check_ttl_seconds = 300
 
     async def login(self) -> None:
         r = await self.client.get(BASE_URL)
@@ -41,8 +44,31 @@ class PureGymClient:
             },
             timeout=10,
         )
+        self._auth_checked_at = time.monotonic()
 
-    async def _request_json(self, method: str, url: str, **kwargs):
+    async def _auth_probe(self) -> bool:
+        r = await self.client.get(f"{API_URL}get_user_search_params")
+        if r.status_code in (401, 403):
+            return False
+        try:
+            data = r.json()
+        except ValueError:
+            return False
+        return data.get("search_days_allowed") == 28
+
+    async def _ensure_authenticated(self) -> None:
+        if self._auth_checked_at is not None:
+            if time.monotonic() - self._auth_checked_at < self._auth_check_ttl_seconds:
+                return
+        if await self._auth_probe():
+            self._auth_checked_at = time.monotonic()
+            return
+        async with self._login_lock:
+            await self.login()
+
+    async def _request_json(self, method: str, url: str, require_auth: bool = True, **kwargs):
+        if require_auth:
+            await self._ensure_authenticated()
         r = await self.client.request(method, url, **kwargs)
         if r.status_code in (401, 403) or "user_login_form" in r.text:
             async with self._login_lock:
