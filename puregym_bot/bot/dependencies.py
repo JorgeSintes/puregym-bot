@@ -16,8 +16,13 @@ async def on_startup(app):
     clients = dict[int, PureGymClient]()
 
     for user in users:
-        clients[user.telegram_id] = PureGymClient(user.puregym_user, user.puregym_pass)
-        await clients[user.telegram_id].login()
+        config_user = next((u for u in config.users if u.telegram_id == user.telegram_id), None)
+        if config_user is None:
+            raise ValueError(f"User with telegram_id {user.telegram_id} exists in DB but not in config")
+        clients[user.telegram_id] = PureGymClient(
+            config_user.puregym_username, config_user.puregym_password.get_secret_value()
+        )
+        # await clients[user.telegram_id].login()
     app.bot_data["puregym_clients"] = clients
 
 

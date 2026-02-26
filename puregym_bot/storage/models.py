@@ -6,10 +6,9 @@ from sqlmodel import Column, DateTime, Field, SQLModel, func
 
 class User(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
-    name: str
     telegram_id: int
-    puregym_user: str
-    puregym_pass: str
+    name: str
+    is_active: bool = False
 
 
 class BookingStatus(str, Enum):

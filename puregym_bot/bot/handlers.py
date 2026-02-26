@@ -5,21 +5,53 @@ from puregym_bot.bot.dependencies import require_client
 from puregym_bot.config import config
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked
+from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import User
+from puregym_bot.storage.repository import set_user_active
 
 
 @require_client
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, client: PureGymClient, user: User):
+async def start(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    client: PureGymClient,
+    user: User,
+):
     if update.effective_chat is None:
         return
 
+    with get_db_session() as session:
+        set_user_active(session, user, True)
+
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Hey {user.name}! I'm your PureGym booking bot. Use /booked_classes to see your upcoming bookings.",
+        text=f"Hey {user.name}! I'm your PureGym booking bot. I will start making bookings for you.",
     )
 
 
-async def test_inline(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@require_client
+async def stop(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    client: PureGymClient,
+    user: User,
+):
+    if update.effective_chat is None:
+        return
+
+    with get_db_session() as session:
+        set_user_active(session, user, False)
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"Hey {user.name}! I will stop making bookings for you. See you next time!",
+    )
+
+
+async def test_inline(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+):
     if update.effective_chat is None or update.message is None:
         return
 
@@ -36,7 +68,10 @@ async def test_inline(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def button(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+) -> None:
     """Parses the CallbackQuery and updates the message text."""
     query = update.callback_query
 
@@ -49,7 +84,10 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 @require_client
 async def booked_classes(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, client: PureGymClient, user: User
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    client: PureGymClient,
+    user: User,
 ):
     if update.effective_chat is None:
         return
@@ -73,7 +111,10 @@ async def booked_classes(
 
 @require_client
 async def all_class_ids(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, client: PureGymClient, user: User
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    client: PureGymClient,
+    user: User,
 ):
     if update.effective_chat is None:
         return
@@ -91,7 +132,10 @@ async def all_class_ids(
 
 @require_client
 async def all_center_ids(
-    update: Update, context: ContextTypes.DEFAULT_TYPE, client: PureGymClient, user: User
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    client: PureGymClient,
+    user: User,
 ):
     if update.effective_chat is None:
         return

@@ -29,8 +29,6 @@ def init_db(users: list[UserConfig]) -> None:
                 user = User(
                     name=user_config.name,
                     telegram_id=user_config.telegram_id,
-                    puregym_user=user_config.puregym_username,
-                    puregym_pass=user_config.puregym_password.get_secret_value(),
                 )
                 session.add(user)
                 session.commit()
