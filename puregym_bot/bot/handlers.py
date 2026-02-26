@@ -2,7 +2,9 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.dependencies import require_client
+from puregym_bot.config import config
 from puregym_bot.puregym.client import PureGymClient
+from puregym_bot.puregym.filters import filter_by_booked
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -22,7 +24,11 @@ async def booked_classes(
     if update.effective_chat is None:
         return
 
-    bookings = await client.get_booked_classes()
+    bookings = await client.get_available_classes(
+        class_ids=config.class_preferences.interested_classes,
+        center_ids=config.class_preferences.interested_centers,
+    )
+    bookings = filter_by_booked(bookings)
     if not bookings:
         await context.bot.send_message(
             chat_id=update.effective_chat.id, text="You have no upcoming bookings."
