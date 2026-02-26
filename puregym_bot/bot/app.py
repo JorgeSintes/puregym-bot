@@ -15,9 +15,18 @@ def build_app():
     )
     start_handler = CommandHandler("start", handlers.start, filters=AUTH_FILTER)
     application.add_handler(start_handler)
+
     booked_classes_handler = CommandHandler(
         "booked_classes", handlers.booked_classes, filters=AUTH_FILTER
     )
     application.add_handler(booked_classes_handler)
+    all_classes_handler = CommandHandler(
+        "class_ids", handlers.all_class_ids, filters=AUTH_FILTER
+    )
+    application.add_handler(all_classes_handler)
+    all_centers_handler = CommandHandler(
+        "center_ids", handlers.all_center_ids, filters=AUTH_FILTER
+    )
+    application.add_handler(all_centers_handler)
 
     return application

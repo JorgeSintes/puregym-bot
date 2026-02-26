@@ -11,6 +11,14 @@ class GymClassTypesGroup(BaseModel):
     title: str
     options: list[GymClassType]
 
+    def format(self) -> str:
+        lines = [f"<b>{self.title}</b>"]
+
+        for option in self.options:
+            lines.append(f"• {option.label} → <code>{option.value}</code>")
+
+        return "\n".join(lines)
+
 
 class Center(BaseModel):
     label: str
@@ -22,6 +30,14 @@ class CenterGroup(BaseModel):
     label: str
     weight: int
     options: list[Center]
+
+    def format(self) -> str:
+        lines = [f"<b>{self.label}</b>"]
+
+        for option in self.options:
+            lines.append(f"• {option.label} → <code>{option.value}</code>")
+
+        return "\n".join(lines)
 
 
 class GymClass(BaseModel):
