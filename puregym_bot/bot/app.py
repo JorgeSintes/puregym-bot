@@ -13,8 +13,11 @@ def build_app():
         .post_shutdown(on_shutdown)
         .build()
     )
+
     start_handler = CommandHandler("start", handlers.start, filters=AUTH_FILTER)
     application.add_handler(start_handler)
+    stop_handler = CommandHandler("stop", handlers.stop, filters=AUTH_FILTER)
+    application.add_handler(stop_handler)
 
     booked_classes_handler = CommandHandler("booked_classes", handlers.booked_classes, filters=AUTH_FILTER)
     application.add_handler(booked_classes_handler)

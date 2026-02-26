@@ -78,11 +78,11 @@ class PureGymClient:
         return r.json()
 
     async def get_all_class_types(self) -> list[GymClassTypesGroup]:
-        data = await self._request_json("GET", f"{API_URL}get_activities")
+        data = await self._request_json("GET", f"{API_URL}get_activities", require_auth=False)
         return [GymClassTypesGroup.model_validate(c) for c in data["classes"]]
 
     async def get_all_centers(self) -> list[CenterGroup]:
-        data = await self._request_json("GET", f"{API_URL}get_activities")
+        data = await self._request_json("GET", f"{API_URL}get_activities", require_auth=False)
         return [CenterGroup.model_validate(c) for c in data["centers"]]
 
     async def get_available_classes(

@@ -7,20 +7,20 @@ from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import User
-from puregym_bot.storage.repository import set_user_active
+from puregym_bot.storage.repository import get_user_by_telegram_id, set_user_active
 
 
-@require_client
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    client: PureGymClient,
-    user: User,
 ):
-    if update.effective_chat is None:
+    if update.effective_chat is None or update.effective_user is None:
         return
 
     with get_db_session() as session:
+        user = get_user_by_telegram_id(session, update.effective_user.id)
+        if user is None:
+            return
         set_user_active(session, user, True)
 
     await context.bot.send_message(

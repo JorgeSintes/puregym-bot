@@ -36,5 +36,5 @@ def init_db(users: list[UserConfig]) -> None:
 
 @contextmanager
 def get_db_session():
-    with Session(engine) as session:
+    with Session(engine, expire_on_commit=False) as session:
         yield session
