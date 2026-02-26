@@ -1,0 +1,6 @@
+telegram_token: <your_telegram_bot_token_here>
+users:
+  - name: <user_name>
+    telegram_id: <user_telegram_id>
+    puregym_username: <user_puregym_username>
+    puregym_password: <user_puregym_password>
