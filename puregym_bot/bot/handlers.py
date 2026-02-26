@@ -1,56 +1,47 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-from puregym_bot.bot.dependencies import require_client
+from puregym_bot.bot.dependencies import HandlerContext
 from puregym_bot.config import config
-from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked
-from puregym_bot.storage.db import get_db_session
-from puregym_bot.storage.models import User
-from puregym_bot.storage.repository import get_user_by_telegram_id, set_user_active
+from puregym_bot.storage.repository import set_user_active
 
 
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
+    ctx: HandlerContext,
 ):
     if update.effective_chat is None or update.effective_user is None:
         return
-
-    with get_db_session() as session:
-        user = get_user_by_telegram_id(session, update.effective_user.id)
-        if user is None:
-            return
-        set_user_active(session, user, True)
+    set_user_active(ctx.session, ctx.user, True)
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Hey {user.name}! I'm your PureGym booking bot. I will start making bookings for you.",
+        text=f"Hey {ctx.user.name}! I'm your PureGym booking bot. I will start making bookings for you.",
     )
 
 
-@require_client
 async def stop(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    client: PureGymClient,
-    user: User,
+    ctx: HandlerContext,
 ):
     if update.effective_chat is None:
         return
 
-    with get_db_session() as session:
-        set_user_active(session, user, False)
+    set_user_active(ctx.session, ctx.user, False)
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Hey {user.name}! I will stop making bookings for you. See you next time!",
+        text=f"Hey {ctx.user.name}! I will stop making bookings for you. See you next time!",
     )
 
 
 async def test_inline(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
+    ctx: HandlerContext,
 ):
     if update.effective_chat is None or update.message is None:
         return
@@ -82,17 +73,15 @@ async def button(
     await query.edit_message_text(text=f"Selected option: {query.data}")
 
 
-@require_client
 async def booked_classes(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    client: PureGymClient,
-    user: User,
+    ctx: HandlerContext,
 ):
     if update.effective_chat is None:
         return
 
-    bookings = await client.get_available_classes(
+    bookings = await ctx.client.get_available_classes(
         class_ids=config.class_preferences.interested_classes,
         center_ids=config.class_preferences.interested_centers,
     )
@@ -109,17 +98,15 @@ async def booked_classes(
     await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
 
-@require_client
 async def all_class_ids(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    client: PureGymClient,
-    user: User,
+    ctx: HandlerContext,
 ):
     if update.effective_chat is None:
         return
 
-    class_groups = await client.get_all_class_types()
+    class_groups = await ctx.client.get_all_class_types()
     lines = ["🏋 <b>Available Class Types</b>\n"]
     for group in class_groups:
         lines.append(group.format())
@@ -130,17 +117,15 @@ async def all_class_ids(
     await context.bot.send_message(chat_id=update.effective_chat.id, text=message, parse_mode="HTML")
 
 
-@require_client
 async def all_center_ids(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
-    client: PureGymClient,
-    user: User,
+    ctx: HandlerContext,
 ):
     if update.effective_chat is None:
         return
 
-    center_groups = await client.get_all_centers()
+    center_groups = await ctx.client.get_all_centers()
     lines = ["🏢 <b>Available Centers</b>\n"]
     for group in center_groups:
         lines.append(group.format())

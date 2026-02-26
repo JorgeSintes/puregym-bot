@@ -1,5 +1,7 @@
-from typing import cast
+from dataclasses import dataclass
+from typing import Awaitable, Callable, cast
 
+from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ContextTypes, filters
 
@@ -8,6 +10,15 @@ from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import User
 from puregym_bot.storage.repository import get_all_users, get_user_by_telegram_id
+
+AUTH_FILTER = filters.User([u.telegram_id for u in config.users])
+
+
+@dataclass
+class HandlerContext:
+    session: Session
+    client: PureGymClient
+    user: User
 
 
 async def on_startup(app):
@@ -34,24 +45,27 @@ async def on_shutdown(app):
             await client.aclose()
 
 
-AUTH_FILTER = filters.User([u.telegram_id for u in config.users])
-
-
-def require_client(handler):
+def build_handler(
+    handler: Callable[[Update, ContextTypes.DEFAULT_TYPE, HandlerContext], Awaitable[None]],
+    *,
+    allow_inactive: bool = False,
+):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_user is None or update.effective_chat is None:
             return
         with get_db_session() as session:
             user = cast(User, get_user_by_telegram_id(session, update.effective_user.id))
-
-        if user.is_active is False:
-            await context.bot.send_message(
-                chat_id=update.effective_chat.id,
-                text=f"Hey {user.name}! You are currently inactive. Please send /start to activate the bot.",
-            )
-            return
-        clients = context.bot_data["puregym_clients"]
-        client = cast(PureGymClient, clients[update.effective_user.id])
-        return await handler(update, context, client, user)
+            if user is None:
+                return
+            if not allow_inactive and user.is_active is False:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id,
+                    text=f"Hey {user.name}! You are currently inactive. Please send /start to activate the bot.",
+                )
+                return
+            clients = context.bot_data["puregym_clients"]
+            client = cast(PureGymClient, clients[update.effective_user.id])
+            ctx = HandlerContext(session=session, client=client, user=user)
+            return await handler(update, context, ctx)
 
     return wrapper

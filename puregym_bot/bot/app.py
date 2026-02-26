@@ -1,33 +1,36 @@
+from telegram import BotCommand
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler
 
 from puregym_bot.bot import handlers
-from puregym_bot.bot.dependencies import AUTH_FILTER, on_shutdown, on_startup
+from puregym_bot.bot.dependencies import AUTH_FILTER, build_handler, on_shutdown, on_startup
+from puregym_bot.bot.registry import COMMANDS
 from puregym_bot.config import config
 
 
 def build_app():
+    async def post_init(app):
+        await on_startup(app)
+        await app.bot.set_my_commands(
+            [BotCommand(command.name, command.description) for command in COMMANDS]
+        )
+
     application = (
         ApplicationBuilder()
         .token(config.telegram_token.get_secret_value())
-        .post_init(on_startup)
+        .post_init(post_init)
         .post_shutdown(on_shutdown)
         .build()
     )
 
-    start_handler = CommandHandler("start", handlers.start, filters=AUTH_FILTER)
-    application.add_handler(start_handler)
-    stop_handler = CommandHandler("stop", handlers.stop, filters=AUTH_FILTER)
-    application.add_handler(stop_handler)
+    for command in COMMANDS:
+        application.add_handler(
+            CommandHandler(
+                command.name,
+                build_handler(command.handler, allow_inactive=command.allow_inactive),
+                filters=AUTH_FILTER,
+            )
+        )
 
-    booked_classes_handler = CommandHandler("booked_classes", handlers.booked_classes, filters=AUTH_FILTER)
-    application.add_handler(booked_classes_handler)
-    all_classes_handler = CommandHandler("class_ids", handlers.all_class_ids, filters=AUTH_FILTER)
-    application.add_handler(all_classes_handler)
-    all_centers_handler = CommandHandler("center_ids", handlers.all_center_ids, filters=AUTH_FILTER)
-    application.add_handler(all_centers_handler)
-
-    test_inline_handler = CommandHandler("test_inline", handlers.test_inline, filters=AUTH_FILTER)
-    application.add_handler(test_inline_handler)
     application.add_handler(CallbackQueryHandler(handlers.button))
 
     return application
