@@ -14,6 +14,7 @@ class User(SQLModel, table=True):
 class BookingStatus(str, Enum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
+    ATTENDED = "attended"
     CANCELLED = "cancelled"
     EXPIRED = "expired"
 
@@ -28,6 +29,7 @@ class ManagedBooking(SQLModel, table=True):
     activity_id: int
     payment_type: str
     participation_id: str | None = None
+    telegram_message_id: int | None = None
 
     # Class timing (so we can reason about reminders)
     class_datetime: datetime = Field(index=True)
@@ -36,4 +38,7 @@ class ManagedBooking(SQLModel, table=True):
     status: BookingStatus = Field(default=BookingStatus.PENDING)
     reminder_sent: bool = False
 
-    created_at: datetime = Field(sa_column=Column(DateTime(timezone=True), server_default=func.now()))
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+    )

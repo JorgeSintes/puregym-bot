@@ -127,5 +127,12 @@ class PureGymClient:
             },
         )
 
+    async def unbook_participation(self, participation_id: str):
+        return await self._request_json(
+            "POST",
+            f"{API_URL}unbook_activity",
+            data={"participationId": participation_id},
+        )
+
     async def aclose(self) -> None:
         await self.client.aclose()

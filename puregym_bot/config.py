@@ -61,6 +61,7 @@ class UserConfig(BaseModel):
 class Config(BaseSettings):
     telegram_token: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
     users: Annotated[list[UserConfig], AfterValidator(valid_list)] = Field(default_factory=list)
+    logging_level: str = "INFO"
 
     max_days_in_advance: int = 28
     max_bookings: int = 18

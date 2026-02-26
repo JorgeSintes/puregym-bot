@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, time
+
 from pydantic import BaseModel
 
 
@@ -57,3 +59,13 @@ class GymClass(BaseModel):
     activityUrl: str
     level: dict
     button: dict
+
+    def format(self) -> str:
+        class_date = datetime.fromisoformat(self.date).date()
+        start_time = time.fromisoformat(self.startTime)
+        class_dt = datetime.combine(class_date, start_time)
+        cancel_deadline = class_dt - timedelta(hours=3)
+        return (
+            f"{self.title} on {self.date} at {self.startTime} "
+            f"({self.location}) | cancel by {cancel_deadline.strftime('%Y-%m-%d %H:%M')}"
+        )

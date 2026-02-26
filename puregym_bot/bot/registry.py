@@ -22,5 +22,6 @@ COMMANDS: list[CommandSpec] = [
     CommandSpec("booked_classes", "Show your upcoming bookings", handlers.booked_classes),
     CommandSpec("class_ids", "List available class types", handlers.all_class_ids),
     CommandSpec("center_ids", "List available centers", handlers.all_center_ids),
+    CommandSpec("run_now", "Run booking cycle immediately", handlers.run_now),
     CommandSpec("test_inline", "Test inline buttons", handlers.test_inline),
 ]
