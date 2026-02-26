@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import asyncio
 from datetime import datetime, timedelta
 
@@ -62,48 +60,23 @@ class PureGymClient:
         data = await self._request_json("GET", f"{API_URL}get_activities")
         return [CenterGroup.model_validate(c) for c in data["centers"]]
 
-    async def find_class_types_ids(self, class_names: list[str]) -> list[int]:
-        activities = await self.get_all_class_types()
-        class_ids = []
-        for group in activities:
-            for option in group.options:
-                if option.label in class_names:
-                    class_ids.append(option.value)
-
-        if len(class_ids) != len(class_names):
-            raise ValueError(
-                f"Could not find all class ids for class names: {class_names}"
-            )
-        return class_ids
-
-    async def find_centers_ids(self, center_names: list[str]) -> list[int]:
-        centers = await self.get_all_centers()
-        center_ids = []
-        for group in centers:
-            for option in group.options:
-                if option.label in center_names:
-                    center_ids.append(option.value)
-
-        if len(center_ids) != len(center_names):
-            raise ValueError(
-                f"Could not find all center ids for center names: {center_names}"
-            )
-        return center_ids
-
-    async def get_available_classes(self) -> list[GymClass]:
-        class_ids = await self.find_class_types_ids(config.INTERESTED_CLASSES)
-        center_ids = await self.find_centers_ids(config.INTERESTED_CENTERS)
-
+    async def get_available_classes(
+        self,
+        class_ids: list[int],
+        center_ids: list[int],
+        from_date: str = datetime.today().strftime("%Y-%m-%d"),
+        to_date: str = (
+            datetime.today() + timedelta(days=config.MAX_DAYS_IN_ADVANCE)
+        ).strftime("%Y-%m-%d"),
+    ) -> list[GymClass]:
         data = await self._request_json(
             "GET",
             f"{API_URL}search_activities",
             params={
                 "classes[]": class_ids,
                 "centers[]": center_ids,
-                "from": datetime.today().strftime("%Y-%m-%d"),
-                "to": (
-                    datetime.today() + timedelta(days=config.MAX_DAYS_IN_ADVANCE)
-                ).strftime("%Y-%m-%d"),
+                "from": from_date,
+                "to": to_date,
             },
         )
 
@@ -112,11 +85,6 @@ class PureGymClient:
             for day in data
             for item in day["items"]
         ]
-
-    async def get_booked_classes(self) -> list[GymClass]:
-        classes = await self.get_available_classes()
-
-        return [c for c in classes if c.participationId is not None]
 
     async def book_class(self, gym_class: GymClass):
         return await self._request_json(
