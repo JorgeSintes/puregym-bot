@@ -3,7 +3,6 @@ from datetime import datetime, timedelta
 
 import httpx
 from bs4 import BeautifulSoup
-from pydantic import SecretStr
 
 from puregym_bot.config import config
 from puregym_bot.puregym.schemas import CenterGroup, GymClass, GymClassTypesGroup
@@ -13,7 +12,7 @@ API_URL = "https://www.puregym.dk/api/"
 
 
 class PureGymClient:
-    def __init__(self, username: str, password: SecretStr):
+    def __init__(self, username: str, password: str):
         self.username = username
         self.password = password
         self.client = httpx.AsyncClient(follow_redirects=True)
@@ -36,7 +35,7 @@ class PureGymClient:
                 "form_build_id": form_build_id,
                 "form_id": "user_login_form",
                 "name": self.username,
-                "pass": self.password.get_secret_value(),
+                "pass": self.password,
                 "redirect_url": "",
                 "op": "Log ind",
             },
@@ -65,9 +64,7 @@ class PureGymClient:
         class_ids: list[int],
         center_ids: list[int],
         from_date: str = datetime.today().strftime("%Y-%m-%d"),
-        to_date: str = (
-            datetime.today() + timedelta(days=config.MAX_DAYS_IN_ADVANCE)
-        ).strftime("%Y-%m-%d"),
+        to_date: str = (datetime.today() + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d"),
     ) -> list[GymClass]:
         data = await self._request_json(
             "GET",
@@ -81,9 +78,7 @@ class PureGymClient:
         )
 
         return [
-            GymClass.model_validate({**item, "date": day["date"]})
-            for day in data
-            for item in day["items"]
+            GymClass.model_validate({**item, "date": day["date"]}) for day in data for item in day["items"]
         ]
 
     async def book_class(self, gym_class: GymClass):

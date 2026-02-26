@@ -3,7 +3,12 @@ from enum import IntEnum
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, SecretStr, ValidationError
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    YamlConfigSettingsSource,
+)
 
 
 def valid_str(value: str) -> str:
@@ -14,6 +19,12 @@ def valid_str(value: str) -> str:
 
 def valid_secret(value: SecretStr) -> SecretStr:
     if value.get_secret_value() == "":
+        raise ValidationError("Field not set")
+    return value
+
+
+def valid_list(value: list) -> list:
+    if len(value) == 0:
         raise ValidationError("Field not set")
     return value
 
@@ -40,16 +51,19 @@ class GymClassPreferences(BaseModel):
     available_time_slots: list[TimeSlot] = Field(default_factory=list)
 
 
+class UserConfig(BaseModel):
+    name: str
+    telegram_id: int
+    puregym_username: Annotated[str, AfterValidator(valid_str)]
+    puregym_password: Annotated[SecretStr, AfterValidator(valid_secret)]
+
+
 class Config(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    telegram_token: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
+    users: Annotated[list[UserConfig], AfterValidator(valid_list)] = Field(default_factory=list)
 
-    TELEGRAM_TOKEN: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
-    TELEGRAM_ID_WHITELIST: list[int] = []
-    PUREGYM_USERNAME: Annotated[str, AfterValidator(valid_str)] = ""
-    PUREGYM_PASSWORD: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
-
-    MAX_DAYS_IN_ADVANCE: int = 28
-    MAX_BOOKINGS: int = 18
+    max_days_in_advance: int = 28
+    max_bookings: int = 18
 
     class_preferences: GymClassPreferences = GymClassPreferences(
         interested_classes=[
@@ -68,6 +82,19 @@ class Config(BaseSettings):
             ),
         ],
     )
+
+    model_config = SettingsConfigDict(yaml_file="config.yaml", yaml_file_encoding="utf-8")
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: BaseSettings,
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (YamlConfigSettingsSource(settings_cls),)  # type: ignore
 
 
 config = Config()
