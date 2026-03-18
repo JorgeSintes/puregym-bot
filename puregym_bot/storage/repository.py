@@ -12,7 +12,7 @@ from puregym_bot.storage.models import (
 def get_bot_state(session: Session) -> BotState:
     bot_state = session.get(BotState, 1)
     if bot_state is None:
-        bot_state = BotState()
+        bot_state = BotState(id=1)
         session.add(bot_state)
         session.commit()
         session.refresh(bot_state)

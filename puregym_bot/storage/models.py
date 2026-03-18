@@ -6,7 +6,7 @@ from sqlmodel import Column, DateTime, Field, SQLModel, func
 
 class BotState(SQLModel, table=True):
     id: int = Field(primary_key=True)
-    is_active: bool = True
+    is_active: bool = False
 
 
 class BookingStatus(str, Enum):
