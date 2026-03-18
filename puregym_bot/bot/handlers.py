@@ -1,20 +1,30 @@
+import json
 import logging
+from datetime import datetime, time
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.dependencies import HandlerContext
+from puregym_bot.bot.jobs import build_prompt_keyboard
 from puregym_bot.config import config
 from puregym_bot.puregym.filters import filter_by_booked
 from puregym_bot.storage.db import get_db_session
-from puregym_bot.storage.models import BookingStatus
+from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
 from puregym_bot.bot.jobs import run_booking_cycle
 from puregym_bot.storage.repository import (
     get_booking_by_participation_id,
-    get_user_by_telegram_id,
+    get_choice_by_id,
     set_booking_status,
-    set_user_active,
+    set_bot_active,
+    set_choice_status,
 )
+
+
+def option_datetime(option: dict) -> datetime:
+    class_date = datetime.fromisoformat(option["date"]).date()
+    start_time = time.fromisoformat(option["startTime"])
+    return datetime.combine(class_date, start_time)
 
 
 async def start(
@@ -24,12 +34,12 @@ async def start(
 ):
     if update.effective_chat is None or update.effective_user is None:
         return
-    set_user_active(ctx.session, ctx.user, True)
+    set_bot_active(ctx.session, True)
     ctx.session.commit()
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Hey {ctx.user.name}! I'm your PureGym booking bot. I will start making bookings for you.",
+        text=f"Hey {config.name}! I'm your PureGym booking bot. I will start making bookings for you.",
     )
 
 
@@ -41,12 +51,12 @@ async def stop(
     if update.effective_chat is None:
         return
 
-    set_user_active(ctx.session, ctx.user, False)
+    set_bot_active(ctx.session, False)
     ctx.session.commit()
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Hey {ctx.user.name}! I will stop making bookings for you. See you next time!",
+        text=f"Hey {config.name}! I will stop making bookings for you. See you next time!",
     )
 
 
@@ -78,6 +88,8 @@ async def button(
     query = update.callback_query
     if query is None or update.effective_user is None:
         return
+    if update.effective_user.id != config.telegram_id:
+        return
 
     # CallbackQueries need to be answered, even if no notification to the user is needed
     # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
@@ -87,11 +99,8 @@ async def button(
     if data.startswith("accept:") or data.startswith("reject:"):
         action, participation_id = data.split(":", 1)
         with get_db_session() as session:
-            user = get_user_by_telegram_id(session, update.effective_user.id)
-            if user is None:
-                return
             booking = get_booking_by_participation_id(session, participation_id)
-            if booking is None or booking.user_id != user.id:
+            if booking is None:
                 return
 
             if booking.status != BookingStatus.PENDING:
@@ -104,8 +113,7 @@ async def button(
                 await query.edit_message_text(text="Booking accepted.")
                 return
 
-            clients = context.bot_data.get("puregym_clients", {})
-            client = clients.get(user.telegram_id)
+            client = context.bot_data.get("puregym_client")
             if client is None:
                 return
             resp = await client.unbook_participation(participation_id)
@@ -116,6 +124,66 @@ async def button(
             else:
                 logging.debug("Failed to cancel booking %s: %s", participation_id, resp)
                 await query.edit_message_text(text="Failed to cancel. I will retry later.")
+        return
+
+    if data.startswith("pick:"):
+        _, choice_id_str, idx_str = data.split(":", 2)
+        with get_db_session() as session:
+            choice = get_choice_by_id(session, int(choice_id_str))
+            if choice is None:
+                return
+            if choice.status != ChoiceStatus.PENDING:
+                await query.edit_message_text(text="This selection has already been handled.")
+                return
+
+            options = json.loads(choice.options_json)
+            idx = int(idx_str)
+            if idx < 0 or idx >= len(options):
+                return
+            selected = options[idx]
+
+            client = context.bot_data.get("puregym_client")
+            if client is None:
+                return
+
+            resp = await client.book_by_ids(
+                selected["booking_id"],
+                selected["activity_id"],
+                selected["payment_type"],
+            )
+            if resp.get("status") != "success":
+                logging.debug("Failed to book selected option: %s", resp)
+                await query.edit_message_text(text="Failed to book that option. Please choose another.")
+                return
+
+            participation_id = resp.get("participationId")
+            if not participation_id:
+                await query.edit_message_text(
+                    text="Booking succeeded but response was incomplete. Please try again."
+                )
+                return
+
+            booking = ManagedBooking(
+                booking_id=selected["booking_id"],
+                activity_id=selected["activity_id"],
+                payment_type=selected["payment_type"],
+                participation_id=participation_id,
+                class_datetime=option_datetime(selected),
+                status=BookingStatus.PENDING,
+            )
+            session.add(booking)
+            set_choice_status(session, choice, ChoiceStatus.HANDLED)
+            session.commit()
+
+            await query.edit_message_text(text="Booked your selection. Please accept or reject.")
+            await context.bot.send_message(
+                chat_id=config.telegram_id,
+                text=(
+                    f"Booked: {selected['title']} on {selected['date']} at {selected['startTime']} "
+                    f"({selected['location']})\nDo you want to keep it?"
+                ),
+                reply_markup=build_prompt_keyboard(participation_id),
+            )
         return
 
     await query.edit_message_text(text=f"Selected option: {query.data}")
@@ -142,7 +210,7 @@ async def booked_classes(
 
     message = "Your upcoming bookings:\n"
     for booking in bookings:
-        message += f"- {booking.title}, {booking.date} at {booking.startTime} at {booking.location}\n"
+        message += f"- {booking.format()}\n"
     await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
 
 
@@ -201,4 +269,4 @@ async def run_now(
         chat_id=update.effective_chat.id,
         text="Running booking cycle now...",
     )
-    await context.job_queue.run_once(callback=run_booking_cycle, when=0)
+    context.job_queue.run_once(callback=run_booking_cycle, when=0)

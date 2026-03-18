@@ -4,11 +4,9 @@ from enum import Enum
 from sqlmodel import Column, DateTime, Field, SQLModel, func
 
 
-class User(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    telegram_id: int
-    name: str
-    is_active: bool = False
+class BotState(SQLModel, table=True):
+    id: int = Field(primary_key=True)
+    is_active: bool = True
 
 
 class BookingStatus(str, Enum):
@@ -21,8 +19,6 @@ class BookingStatus(str, Enum):
 
 class ManagedBooking(SQLModel, table=True):
     id: int | None = Field(default=None, primary_key=True)
-
-    user_id: int = Field(foreign_key="user.id", index=True)
 
     # PureGym identifiers
     booking_id: str = Field(index=True)
@@ -38,6 +34,29 @@ class ManagedBooking(SQLModel, table=True):
     status: BookingStatus = Field(default=BookingStatus.PENDING)
     reminder_sent: bool = False
 
+    created_at: datetime | None = Field(
+        default=None,
+        sa_column=Column(DateTime(timezone=True), server_default=func.now()),
+    )
+
+
+class ChoiceStatus(str, Enum):
+    PENDING = "pending"
+    HANDLED = "handled"
+    EXPIRED = "expired"
+
+
+class BookingChoice(SQLModel, table=True):
+    id: int | None = Field(default=None, primary_key=True)
+
+    slot_date: str = Field(index=True)
+    slot_start: str
+    slot_end: str
+
+    options_json: str
+    message_id: int | None = None
+
+    status: ChoiceStatus = Field(default=ChoiceStatus.PENDING)
     created_at: datetime | None = Field(
         default=None,
         sa_column=Column(DateTime(timezone=True), server_default=func.now()),

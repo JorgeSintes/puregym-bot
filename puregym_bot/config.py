@@ -51,45 +51,24 @@ class GymClassPreferences(BaseModel):
     available_time_slots: list[TimeSlot] = Field(default_factory=list)
 
 
-class UserConfig(BaseModel):
+class Config(BaseSettings):
+    telegram_token: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
     name: str
     telegram_id: int
     puregym_username: Annotated[str, AfterValidator(valid_str)]
     puregym_password: Annotated[SecretStr, AfterValidator(valid_secret)]
-
-
-class Config(BaseSettings):
-    telegram_token: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
-    users: Annotated[list[UserConfig], AfterValidator(valid_list)] = Field(default_factory=list)
+    class_preferences: GymClassPreferences
     logging_level: str = "INFO"
 
     max_days_in_advance: int = 28
     max_bookings: int = 18
-
-    class_preferences: GymClassPreferences = GymClassPreferences(
-        interested_classes=[
-            34941,  # Bike power
-            23742,  # Bike standard
-        ],
-        interested_centers=[
-            123,  # Kbh Ø., Århusgade
-            172,  # Kbh Ø., Strandvejen
-        ],
-        available_time_slots=[
-            TimeSlot(
-                day_of_week=Weekday.TUESDAY,
-                start_time=time(hour=17, minute=0),
-                end_time=time(hour=22, minute=0),
-            ),
-        ],
-    )
 
     model_config = SettingsConfigDict(yaml_file="config.yaml", yaml_file_encoding="utf-8")
 
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls: BaseSettings,
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
@@ -98,4 +77,8 @@ class Config(BaseSettings):
         return (YamlConfigSettingsSource(settings_cls),)  # type: ignore
 
 
-config = Config()
+def get_config() -> Config:
+    return Config()  # type: ignore[call-arg]
+
+
+config = get_config()

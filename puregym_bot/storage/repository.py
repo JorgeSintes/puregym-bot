@@ -1,24 +1,29 @@
 from sqlmodel import Session, col, select
 
-from puregym_bot.storage.models import BookingStatus, ManagedBooking, User
+from puregym_bot.storage.models import (
+    BookingChoice,
+    BookingStatus,
+    BotState,
+    ChoiceStatus,
+    ManagedBooking,
+)
 
 
-def get_all_users(session: Session) -> list[User]:
-    return list(session.exec(select(User)).all())
+def get_bot_state(session: Session) -> BotState:
+    bot_state = session.get(BotState, 1)
+    if bot_state is None:
+        bot_state = BotState()
+        session.add(bot_state)
+        session.commit()
+        session.refresh(bot_state)
+    return bot_state
 
 
-def get_active_users(session: Session) -> list[User]:
-    return list(session.exec(select(User).where(col(User.is_active).is_(True))).all())
-
-
-def get_user_by_telegram_id(session: Session, telegram_id: int) -> User | None:
-    statement = select(User).where(User.telegram_id == telegram_id)
-    return session.exec(statement).first()
-
-
-def set_user_active(session: Session, user: User, is_active: bool) -> None:
-    user.is_active = is_active
-    session.add(user)
+def set_bot_active(session: Session, is_active: bool) -> BotState:
+    bot_state = get_bot_state(session)
+    bot_state.is_active = is_active
+    session.add(bot_state)
+    return bot_state
 
 
 def get_booking_by_participation_id(session: Session, participation_id: str) -> ManagedBooking | None:
@@ -31,17 +36,15 @@ def get_booking_by_booking_id(session: Session, booking_id: str) -> ManagedBooki
     return session.exec(statement).first()
 
 
-def get_active_bookings(session: Session, user_id: int) -> list[ManagedBooking]:
+def get_active_bookings(session: Session) -> list[ManagedBooking]:
     statement = select(ManagedBooking).where(
-        ManagedBooking.user_id == user_id,
         col(ManagedBooking.status).in_([BookingStatus.PENDING.value, BookingStatus.CONFIRMED.value]),
     )
     return list(session.exec(statement).all())
 
 
-def get_pending_bookings(session: Session, user_id: int) -> list[ManagedBooking]:
+def get_pending_bookings(session: Session) -> list[ManagedBooking]:
     statement = select(ManagedBooking).where(
-        ManagedBooking.user_id == user_id,
         ManagedBooking.status == BookingStatus.PENDING,
     )
     return list(session.exec(statement).all())
@@ -64,3 +67,34 @@ def set_reminder_sent(session: Session, booking: ManagedBooking) -> None:
 def set_message_id(session: Session, booking: ManagedBooking, message_id: int) -> None:
     booking.telegram_message_id = message_id
     session.add(booking)
+
+
+def get_pending_choice(
+    session: Session, slot_date: str, slot_start: str, slot_end: str
+) -> BookingChoice | None:
+    statement = select(BookingChoice).where(
+        BookingChoice.slot_date == slot_date,
+        BookingChoice.slot_start == slot_start,
+        BookingChoice.slot_end == slot_end,
+        BookingChoice.status == ChoiceStatus.PENDING,
+    )
+    return session.exec(statement).first()
+
+
+def add_booking_choice(session: Session, choice: BookingChoice) -> None:
+    session.add(choice)
+
+
+def set_choice_status(session: Session, choice: BookingChoice, status: ChoiceStatus) -> None:
+    choice.status = status
+    session.add(choice)
+
+
+def set_choice_message_id(session: Session, choice: BookingChoice, message_id: int) -> None:
+    choice.message_id = message_id
+    session.add(choice)
+
+
+def get_choice_by_id(session: Session, choice_id: int) -> BookingChoice | None:
+    statement = select(BookingChoice).where(BookingChoice.id == choice_id)
+    return session.exec(statement).first()

@@ -8,7 +8,7 @@ it will then unbook me and book the next class I'm interested in.
 - If I don't respond to the notification, it should unbook me before the closing time ends, to avoid paying
 a no-show-up fee. That's 2 hours before the class time.
 - It should be fully configurable via Telegram, providing username and secrets through it.
-- Also, showing the current schedules and different classes I'm interested in. Saving preferences per username
+- Also, showing the current schedules and different classes I'm interested in. Saving preferences for one configured account
 based on the gyms I'd like to go, classes I'm interested in and available times in the week.
 - I can see classes with 28 days in advance.
 - Up to 18 bookings (REALLY?)

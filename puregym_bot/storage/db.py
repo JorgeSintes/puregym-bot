@@ -1,10 +1,9 @@
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, create_engine
 
-from puregym_bot.config import UserConfig
-from puregym_bot.storage.models import User
+from puregym_bot.storage.models import BotState
 
 DATABASE_PATH = Path("puregym_bot.db")
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
@@ -16,22 +15,14 @@ engine = create_engine(
 )
 
 
-def init_db(users: list[UserConfig]) -> None:
+def init_db() -> None:
     # Create DB file + tables if not exists
     SQLModel.metadata.create_all(engine)
 
     with Session(engine) as session:
-        for user_config in users:
-            statement = select(User).where(User.telegram_id == user_config.telegram_id)
-            user = session.exec(statement).first()
-
-            if user is None:
-                user = User(
-                    name=user_config.name,
-                    telegram_id=user_config.telegram_id,
-                )
-                session.add(user)
-                session.commit()
+        if session.get(BotState, 1) is None:
+            session.add(BotState())
+            session.commit()
 
 
 @contextmanager

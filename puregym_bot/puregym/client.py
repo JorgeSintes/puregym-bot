@@ -118,6 +118,17 @@ class PureGymClient:
             },
         )
 
+    async def book_by_ids(self, booking_id: str, activity_id: int, payment_type: str):
+        return await self._request_json(
+            "POST",
+            f"{API_URL}book_activity",
+            data={
+                "bookingId": booking_id,
+                "activityId": activity_id,
+                "payment_type": payment_type,
+            },
+        )
+
     async def unbook_class(self, gym_class: GymClass):
         return await self._request_json(
             "POST",
