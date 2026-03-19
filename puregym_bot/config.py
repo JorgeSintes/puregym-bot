@@ -77,8 +77,4 @@ class Config(BaseSettings):
         return (YamlConfigSettingsSource(settings_cls),)  # type: ignore
 
 
-def get_config() -> Config:
-    return Config()  # type: ignore[call-arg]
-
-
-config = get_config()
+config = Config()  # type: ignore[call-arg]

@@ -21,7 +21,7 @@ def init_db() -> None:
 
     with Session(engine) as session:
         if session.get(BotState, 1) is None:
-            session.add(BotState())
+            session.add(BotState(id=1))
             session.commit()
 
 
@@ -29,3 +29,7 @@ def init_db() -> None:
 def get_db_session():
     with Session(engine, expire_on_commit=False) as session:
         yield session
+
+
+if __name__ == "__main__":
+    init_db()
