@@ -2,7 +2,7 @@ from datetime import time
 from enum import IntEnum
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, Field, SecretStr, ValidationError
+from pydantic import AfterValidator, BaseModel, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -50,6 +50,24 @@ class GymClassPreferences(BaseModel):
     interested_centers: list[int]
     available_time_slots: list[TimeSlot] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def validate_non_overlapping_time_slots(self):
+        slots_by_day: dict[Weekday, list[TimeSlot]] = {}
+        for slot in self.available_time_slots:
+            slots_by_day.setdefault(slot.day_of_week, []).append(slot)
+
+        for day, slots in slots_by_day.items():
+            sorted_slots = sorted(slots, key=lambda slot: (slot.start_time, slot.end_time))
+            for previous, current in zip(sorted_slots, sorted_slots[1:]):
+                if current.start_time < previous.end_time:
+                    raise ValueError(
+                        "Overlapping time slots are not allowed for "
+                        f"{Weekday(day).name}: {previous.start_time.isoformat()}-{previous.end_time.isoformat()} "
+                        f"overlaps with {current.start_time.isoformat()}-{current.end_time.isoformat()}"
+                    )
+
+        return self
+
 
 class Config(BaseSettings):
     telegram_token: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
@@ -62,6 +80,8 @@ class Config(BaseSettings):
 
     max_days_in_advance: int = 28
     max_bookings: int = 18
+    booking_reminder_hours: int = 24
+    pending_auto_cancel_hours: int = 3
 
     model_config = SettingsConfigDict(yaml_file="config.yaml", yaml_file_encoding="utf-8")
 

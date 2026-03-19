@@ -89,9 +89,14 @@ class PureGymClient:
         self,
         class_ids: list[int],
         center_ids: list[int],
-        from_date: str = datetime.today().strftime("%Y-%m-%d"),
-        to_date: str = (datetime.today() + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d"),
+        from_date: str | None = None,
+        to_date: str | None = None,
     ) -> list[GymClass]:
+        if from_date is None:
+            from_date = datetime.today().strftime("%Y-%m-%d")
+        if to_date is None:
+            to_date = (datetime.today() + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d")
+
         data = await self._request_json(
             "GET",
             f"{API_URL}search_activities",

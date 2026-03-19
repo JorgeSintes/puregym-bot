@@ -1,3 +1,5 @@
+from datetime import datetime, time
+
 from sqlmodel import Session, col, select
 
 from puregym_bot.storage.models import (
@@ -46,6 +48,28 @@ def get_active_bookings(session: Session) -> list[ManagedBooking]:
 def get_pending_bookings(session: Session) -> list[ManagedBooking]:
     statement = select(ManagedBooking).where(
         ManagedBooking.status == BookingStatus.PENDING,
+    )
+    return list(session.exec(statement).all())
+
+
+def get_handled_bookings_for_slot(
+    session: Session,
+    slot_date: str,
+    slot_start: str,
+    slot_end: str,
+) -> list[ManagedBooking]:
+    slot_start_dt = datetime.combine(datetime.fromisoformat(slot_date).date(), time.fromisoformat(slot_start))
+    slot_end_dt = datetime.combine(datetime.fromisoformat(slot_date).date(), time.fromisoformat(slot_end))
+    statement = select(ManagedBooking).where(
+        ManagedBooking.class_datetime >= slot_start_dt,
+        ManagedBooking.class_datetime < slot_end_dt,
+        col(ManagedBooking.status).in_(
+            [
+                BookingStatus.PENDING.value,
+                BookingStatus.CONFIRMED.value,
+                BookingStatus.CANCELLED.value,
+            ]
+        ),
     )
     return list(session.exec(statement).all())
 

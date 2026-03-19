@@ -12,3 +12,5 @@ class_preferences:
     - day_of_week: 1
       start_time: "17:00:00"
       end_time: "22:00:00"
+booking_reminder_hours: 24
+pending_auto_cancel_hours: 3

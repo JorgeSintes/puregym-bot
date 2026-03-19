@@ -96,15 +96,22 @@ async def button(
     await query.answer()
 
     data = query.data or ""
-    if data.startswith("accept:") or data.startswith("reject:"):
+    if data.startswith("accept:") or data.startswith("reject:") or data.startswith("cancel:"):
         action, participation_id = data.split(":", 1)
         with get_db_session() as session:
             booking = get_booking_by_participation_id(session, participation_id)
             if booking is None:
                 return
 
-            if booking.status != BookingStatus.PENDING:
+            if action in {"accept", "reject"} and booking.status != BookingStatus.PENDING:
                 await query.edit_message_text(text="This booking has already been handled.")
+                return
+
+            if action == "cancel" and booking.status not in {
+                BookingStatus.PENDING,
+                BookingStatus.CONFIRMED,
+            }:
+                await query.edit_message_text(text="This booking can no longer be cancelled.")
                 return
 
             if action == "accept":
