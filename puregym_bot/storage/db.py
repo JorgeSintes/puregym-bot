@@ -20,9 +20,13 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 
     with Session(engine) as session:
-        if session.get(BotState, 1) is None:
+        if (state := session.get(BotState, 1)) is None:
             session.add(BotState(id=1))
-            session.commit()
+        else:
+            state.is_active = False
+            session.add(state)
+
+        session.commit()
 
 
 @contextmanager
