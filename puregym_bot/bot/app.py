@@ -3,7 +3,7 @@ from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandle
 
 from puregym_bot.bot import handlers
 from puregym_bot.bot.dependencies import AUTH_FILTER, build_handler, on_shutdown, on_startup
-from puregym_bot.bot.jobs import run_booking_cycle
+from puregym_bot.bot.booking_cycle import run_booking_cycle
 from puregym_bot.bot.registry import COMMANDS
 from puregym_bot.config import config
 

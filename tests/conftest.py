@@ -4,7 +4,7 @@ from datetime import time
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
-from puregym_bot.bot import jobs
+from puregym_bot.bot import booking_cycle
 from puregym_bot.config import GymClassPreferences, TimeSlot, Weekday, config
 from puregym_bot.storage.models import BotState
 
@@ -28,7 +28,7 @@ def session_factory(test_engine):
 
 @pytest.fixture
 def configured_jobs(monkeypatch, session_factory):
-    monkeypatch.setattr(jobs, "get_db_session", session_factory)
+    monkeypatch.setattr(booking_cycle, "get_db_session", session_factory)
     monkeypatch.setattr(config, "telegram_id", 1)
     monkeypatch.setattr(config, "max_bookings", 10)
     monkeypatch.setattr(config, "max_days_in_advance", 28)

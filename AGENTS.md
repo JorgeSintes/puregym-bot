@@ -19,7 +19,7 @@
   - Telegram commands and callback handlers.
   - `/start` and `/stop` toggle the global bot activity state.
   - Callback flows currently support `accept:`, `reject:`, `pick:`, and `cancel:`.
-- `puregym_bot/bot/jobs.py`
+- `puregym_bot/bot/booking_cycle.py`
   - Contains the booking-cycle orchestration and step logic.
   - Uses dataclass-based prompt outputs to keep the flow testable.
 - `puregym_bot/storage/models.py`
@@ -64,7 +64,7 @@
 
 - Be careful with config imports: `config` is instantiated at import time.
 - Preserve the single-user assumptions across config, handlers, jobs, and DB models.
-- If changing callback behavior, also review the prompt builders in `puregym_bot/bot/jobs.py` and the callback handling in `puregym_bot/bot/handlers.py` together.
+- If changing callback behavior, also review the prompt builders in `puregym_bot/bot/booking_cycle.py` and the callback handling in `puregym_bot/bot/handlers.py` together.
 - If changing booking-cycle timing behavior, also update config defaults, template config, and tests.
 
 ## Good Validation Commands

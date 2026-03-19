@@ -6,7 +6,7 @@ import time_machine
 from sqlmodel import Session, select
 from telegram.ext import ContextTypes
 
-from puregym_bot.bot.jobs import run_booking_cycle
+from puregym_bot.bot.booking_cycle import run_booking_cycle
 from puregym_bot.storage.models import BookingStatus, BotState, ManagedBooking
 from tests.fakes import FakeContext, FakePureGymClient, make_gym_class
 

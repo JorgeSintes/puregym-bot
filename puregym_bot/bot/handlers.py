@@ -5,13 +5,12 @@ from datetime import datetime, time
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
+from puregym_bot.bot.booking_cycle import build_prompt_keyboard, run_booking_cycle
 from puregym_bot.bot.dependencies import HandlerContext
-from puregym_bot.bot.jobs import build_prompt_keyboard
 from puregym_bot.config import config
 from puregym_bot.puregym.filters import filter_by_booked
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
-from puregym_bot.bot.jobs import run_booking_cycle
 from puregym_bot.storage.repository import (
     get_booking_by_participation_id,
     get_choice_by_id,

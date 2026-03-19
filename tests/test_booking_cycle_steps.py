@@ -4,7 +4,7 @@ from typing import cast
 import pytest
 from sqlmodel import Session, select
 
-from puregym_bot.bot import jobs
+from puregym_bot.bot import booking_cycle
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.storage.models import BookingChoice, BookingStatus, BotState, ManagedBooking
 from tests.fakes import FakePureGymClient, make_gym_class
@@ -14,14 +14,14 @@ def test_is_cycle_active_respects_bot_state(configured_jobs, test_engine):
     with Session(test_engine, expire_on_commit=False) as session:
         session.add(BotState(id=1, is_active=False))
         session.commit()
-        assert jobs.is_cycle_active(session) is False
+        assert booking_cycle.is_cycle_active(session) is False
 
         state = session.get(BotState, 1)
         assert state is not None
         state.is_active = True
         session.add(state)
         session.commit()
-        assert jobs.is_cycle_active(session) is True
+        assert booking_cycle.is_cycle_active(session) is True
 
 
 def test_reconcile_bookings_missing_in_puregym(configured_jobs, test_engine):
@@ -48,7 +48,9 @@ def test_reconcile_bookings_missing_in_puregym(configured_jobs, test_engine):
         session.add(future_pending)
         session.commit()
 
-        result = jobs.reconcile_bookings_missing_in_puregym(session, booked_by_participation={}, now=now)
+        result = booking_cycle.reconcile_bookings_missing_in_puregym(
+            session, booked_by_participation={}, now=now
+        )
         assert len(result.prompts) == 2
 
         refreshed_past = session.get(ManagedBooking, past_confirmed.id)
@@ -71,7 +73,7 @@ def test_import_untracked_bookings_creates_pending_and_prompt(configured_jobs, t
     )
 
     with Session(test_engine, expire_on_commit=False) as session:
-        result = jobs.import_untracked_bookings(session, {"pid-manual": gym_class})
+        result = booking_cycle.import_untracked_bookings(session, {"pid-manual": gym_class})
         assert len(result.prompts) == 1
         prompt = result.prompts[0]
         assert prompt.booking is not None
@@ -105,7 +107,7 @@ def test_detect_booking_state_mismatch_warns_and_prompts(configured_jobs, test_e
         session.commit()
 
         with caplog.at_level("WARNING"):
-            result = jobs.detect_booking_state_mismatch(session, {"pid-puregym": gym_class})
+            result = booking_cycle.detect_booking_state_mismatch(session, {"pid-puregym": gym_class})
 
     assert len(result.prompts) == 1
     assert "Booking state mismatch detected after reconciliation" in result.prompts[0].message.text
@@ -139,7 +141,7 @@ def test_detect_booking_state_mismatch_is_silent_when_sets_match(configured_jobs
         session.commit()
 
         with caplog.at_level("WARNING"):
-            result = jobs.detect_booking_state_mismatch(session, {"pid-match": gym_class})
+            result = booking_cycle.detect_booking_state_mismatch(session, {"pid-match": gym_class})
 
     assert result.prompts == []
     assert caplog.text == ""
@@ -174,13 +176,13 @@ async def test_handle_slot_booking_actions_single_and_multiple(configured_jobs, 
         participation_id=None,
     )
 
-    grouped = jobs.group_by_slot(
-        [single, option1, option2], jobs.config.class_preferences.available_time_slots
+    grouped = booking_cycle.group_by_slot(
+        [single, option1, option2], booking_cycle.config.class_preferences.available_time_slots
     )
     client = FakePureGymClient([])
 
     with Session(test_engine, expire_on_commit=False) as session:
-        result = await jobs.handle_slot_booking_actions(
+        result = await booking_cycle.handle_slot_booking_actions(
             session,
             cast(PureGymClient, client),
             grouped,
@@ -215,7 +217,9 @@ async def test_handle_slot_booking_actions_skips_handled_slot(configured_jobs, t
         end=time(19, 0),
         participation_id=None,
     )
-    grouped = jobs.group_by_slot([single], jobs.config.class_preferences.available_time_slots)
+    grouped = booking_cycle.group_by_slot(
+        [single], booking_cycle.config.class_preferences.available_time_slots
+    )
     client = FakePureGymClient([])
 
     with Session(test_engine, expire_on_commit=False) as session:
@@ -231,7 +235,7 @@ async def test_handle_slot_booking_actions_skips_handled_slot(configured_jobs, t
         )
         session.commit()
 
-        result = await jobs.handle_slot_booking_actions(
+        result = await booking_cycle.handle_slot_booking_actions(
             session,
             cast(PureGymClient, client),
             grouped,
@@ -265,12 +269,14 @@ async def test_handle_slot_booking_actions_warns_and_skips_when_booked_class_has
         end=time(20, 0),
         participation_id=None,
     )
-    grouped = jobs.group_by_slot([booked, available], jobs.config.class_preferences.available_time_slots)
+    grouped = booking_cycle.group_by_slot(
+        [booked, available], booking_cycle.config.class_preferences.available_time_slots
+    )
     client = FakePureGymClient([])
 
     with Session(test_engine, expire_on_commit=False) as session:
         with caplog.at_level("WARNING"):
-            result = await jobs.handle_slot_booking_actions(
+            result = await booking_cycle.handle_slot_booking_actions(
                 session,
                 cast(PureGymClient, client),
                 grouped,
@@ -307,7 +313,7 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
         session.add(confirmed)
         session.commit()
 
-        first = jobs.send_due_reminders(session, now, reminder_hours=24)
+        first = booking_cycle.send_due_reminders(session, now, reminder_hours=24)
         assert len(first.prompts) == 2
         callbacks = {
             button.callback_data
@@ -325,7 +331,7 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
         assert refreshed_pending.reminder_sent is True
         assert refreshed_confirmed.reminder_sent is True
 
-        second = jobs.send_due_reminders(session, now, reminder_hours=24)
+        second = booking_cycle.send_due_reminders(session, now, reminder_hours=24)
         assert second.prompts == []
 
 
@@ -355,7 +361,7 @@ async def test_auto_cancel_stale_pending_bookings(configured_jobs, test_engine):
         session.add(future)
         session.commit()
 
-        result = await jobs.auto_cancel_stale_pending_bookings(
+        result = await booking_cycle.auto_cancel_stale_pending_bookings(
             session,
             cast(PureGymClient, client),
             now,
