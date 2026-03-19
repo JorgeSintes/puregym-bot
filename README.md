@@ -1,14 +1,29 @@
 # PureGym Bot
-It's purpose is to automatically book me for classes in my wanted schedule automatically and send a 
-notifications via Telegram I can respond to.
 
-## Features
-- I should be able to respond to that notification saying whether I want to keep that class or not.  If not,
-it will then unbook me and book the next class I'm interested in.
-- If I don't respond to the notification, it should unbook me before the closing time ends, to avoid paying
-a no-show-up fee. That's 2 hours before the class time.
-- It should be fully configurable via Telegram, providing username and secrets through it.
-- Also, showing the current schedules and different classes I'm interested in. Saving preferences for one configured account
-based on the gyms I'd like to go, classes I'm interested in and available times in the week.
-- I can see classes with 28 days in advance.
-- Up to 18 bookings (REALLY?)
+Single-user Telegram bot for automatically booking PureGym classes that match a configured schedule.
+
+## What it does
+
+- Runs the booking cycle automatically while auto-booking is enabled
+- Sends Telegram prompts so you can accept or reject pending bookings
+- Sends reminders before class time
+- Cancels stale pending bookings before they get too close to class time
+- Keeps track of booking state locally so it does not repeatedly prompt for the same slot
+
+## Commands
+
+- `/start` enables automatic booking-cycle runs
+- `/stop` disables automatic booking-cycle runs
+- `/status` shows whether automatic booking is currently enabled
+- `/booked_classes` shows your upcoming booked classes
+- `/class_ids` lists available class types so you can update the config
+- `/center_ids` lists available centers so you can update the config
+- `/run_now` queues an immediate booking-cycle run
+
+When automatic booking is disabled, the informational commands still work. `/run_now` also still works as a command, but the booking cycle will respect the disabled state and skip booking.
+
+## Notes
+
+- The bot is configured for one Telegram user and one PureGym account
+- Class matching is based on configured class IDs, center IDs, and weekly time slots
+- The booking window currently looks ahead up to 28 days

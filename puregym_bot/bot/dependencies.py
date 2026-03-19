@@ -48,7 +48,10 @@ def build_handler(
             if not allow_inactive and bot_state.is_active is False:
                 await context.bot.send_message(
                     chat_id=update.effective_chat.id,
-                    text=f"Hey {config.name}! You are currently inactive. Please send /start to activate the bot.",
+                    text=(
+                        f"Hey {config.name}! Automatic booking is currently disabled. "
+                        "Send /start to enable it again."
+                    ),
                 )
                 return
             client = cast(PureGymClient, context.bot_data["puregym_client"])

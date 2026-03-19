@@ -2,7 +2,7 @@ import json
 import logging
 from datetime import datetime, time
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import Update
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.booking_cycle import build_prompt_keyboard, run_booking_cycle
@@ -38,7 +38,10 @@ async def start(
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Hey {config.name}! I'm your PureGym booking bot. I will start making bookings for you.",
+        text=(
+            f"Hey {config.name}! Automatic booking is now enabled. "
+            "I will keep running the booking cycle for you."
+        ),
     )
 
 
@@ -55,27 +58,27 @@ async def stop(
 
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"Hey {config.name}! I will stop making bookings for you. See you next time!",
+        text=(
+            f"Hey {config.name}! Automatic booking is now disabled. "
+            "You can still use the other commands whenever you want."
+        ),
     )
 
 
-async def test_inline(
+async def status(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
-    if update.effective_chat is None or update.message is None:
+    if update.effective_chat is None:
         return
 
-    await update.message.reply_text(
-        "Choose an option:",
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [
-                    InlineKeyboardButton("Option 1", callback_data="option_1"),
-                    InlineKeyboardButton("Option 2", callback_data="option_2"),
-                ]
-            ]
+    auto_booking_status = "enabled" if ctx.bot_active else "disabled"
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=(
+            f"Automatic booking is currently {auto_booking_status}. "
+            "Use /start to enable it or /stop to disable it."
         ),
     )
 

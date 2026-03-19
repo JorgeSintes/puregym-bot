@@ -17,7 +17,8 @@
   - Wires the single shared `PureGymClient` and authorizes only `config.telegram_id`.
 - `puregym_bot/bot/handlers.py`
   - Telegram commands and callback handlers.
-  - `/start` and `/stop` toggle the global bot activity state.
+  - `/start` and `/stop` toggle automatic booking via the global bot activity state.
+  - Informational commands still work while automatic booking is stopped.
   - Callback flows currently support `accept:`, `reject:`, `pick:`, and `cancel:`.
 - `puregym_bot/bot/booking_cycle.py`
   - Contains the booking-cycle orchestration and step logic.
@@ -35,7 +36,8 @@
 ## Important Domain Rules
 
 - The app is single-user. Do not reintroduce per-user DB models or `config.users` unless explicitly requested.
-- `/start` and `/stop` control one global bot state via `BotState.is_active`.
+- `/start` enables automatic booking and `/stop` disables it via `BotState.is_active`.
+- Informational/manual commands may still run while `BotState.is_active` is false.
 - `ManagedBooking.reminder_sent` is a single reminder flag:
   - If a pending booking is reminded, do not remind again after it is accepted.
   - If a confirmed booking is reminded, do not remind again.
