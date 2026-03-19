@@ -2,7 +2,7 @@ from datetime import time
 from enum import IntEnum
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, Field, SecretStr, ValidationError
+from pydantic import AfterValidator, BaseModel, Field, SecretStr, ValidationError, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -50,46 +50,45 @@ class GymClassPreferences(BaseModel):
     interested_centers: list[int]
     available_time_slots: list[TimeSlot] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def validate_non_overlapping_time_slots(self):
+        slots_by_day: dict[Weekday, list[TimeSlot]] = {}
+        for slot in self.available_time_slots:
+            slots_by_day.setdefault(slot.day_of_week, []).append(slot)
 
-class UserConfig(BaseModel):
-    name: str
-    telegram_id: int
-    puregym_username: Annotated[str, AfterValidator(valid_str)]
-    puregym_password: Annotated[SecretStr, AfterValidator(valid_secret)]
+        for day, slots in slots_by_day.items():
+            sorted_slots = sorted(slots, key=lambda slot: (slot.start_time, slot.end_time))
+            for previous, current in zip(sorted_slots, sorted_slots[1:]):
+                if current.start_time < previous.end_time:
+                    raise ValueError(
+                        "Overlapping time slots are not allowed for "
+                        f"{Weekday(day).name}: {previous.start_time.isoformat()}-{previous.end_time.isoformat()} "
+                        f"overlaps with {current.start_time.isoformat()}-{current.end_time.isoformat()}"
+                    )
+
+        return self
 
 
 class Config(BaseSettings):
     telegram_token: Annotated[SecretStr, AfterValidator(valid_secret)] = SecretStr("")
-    users: Annotated[list[UserConfig], AfterValidator(valid_list)] = Field(default_factory=list)
+    name: str
+    telegram_id: int
+    puregym_username: Annotated[str, AfterValidator(valid_str)]
+    puregym_password: Annotated[SecretStr, AfterValidator(valid_secret)]
+    class_preferences: GymClassPreferences
     logging_level: str = "INFO"
 
     max_days_in_advance: int = 28
     max_bookings: int = 18
-
-    class_preferences: GymClassPreferences = GymClassPreferences(
-        interested_classes=[
-            34941,  # Bike power
-            23742,  # Bike standard
-        ],
-        interested_centers=[
-            123,  # Kbh Ø., Århusgade
-            172,  # Kbh Ø., Strandvejen
-        ],
-        available_time_slots=[
-            TimeSlot(
-                day_of_week=Weekday.TUESDAY,
-                start_time=time(hour=17, minute=0),
-                end_time=time(hour=22, minute=0),
-            ),
-        ],
-    )
+    booking_reminder_hours: int = 24
+    pending_auto_cancel_hours: int = 3
 
     model_config = SettingsConfigDict(yaml_file="config.yaml", yaml_file_encoding="utf-8")
 
     @classmethod
     def settings_customise_sources(
         cls,
-        settings_cls: BaseSettings,
+        settings_cls: type[BaseSettings],
         init_settings: PydanticBaseSettingsSource,
         env_settings: PydanticBaseSettingsSource,
         dotenv_settings: PydanticBaseSettingsSource,
@@ -98,4 +97,4 @@ class Config(BaseSettings):
         return (YamlConfigSettingsSource(settings_cls),)  # type: ignore
 
 
-config = Config()
+config = Config()  # type: ignore[call-arg]

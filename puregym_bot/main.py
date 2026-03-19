@@ -11,6 +11,6 @@ logging.basicConfig(
 
 
 if __name__ == "__main__":
-    init_db(config.users)
+    init_db()
     application = build_app()
     application.run_polling()

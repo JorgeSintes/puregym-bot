@@ -1,0 +1,550 @@
+import json
+import logging
+from dataclasses import dataclass, field
+from datetime import datetime, time, timedelta
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+
+from puregym_bot.config import TimeSlot, config
+from puregym_bot.puregym.client import PureGymClient
+from puregym_bot.puregym.filters import filter_by_booked, filter_by_time_slots
+from puregym_bot.puregym.schemas import GymClass
+from puregym_bot.storage.db import get_db_session
+from puregym_bot.storage.models import BookingChoice, BookingStatus, ManagedBooking
+from puregym_bot.storage.repository import (
+    add_booking_choice,
+    add_managed_booking,
+    get_active_bookings,
+    get_booking_by_participation_id,
+    get_bot_state,
+    get_handled_bookings_for_slot,
+    get_pending_bookings,
+    get_pending_choice,
+    set_booking_status,
+    set_choice_message_id,
+    set_message_id,
+    set_reminder_sent,
+)
+
+
+@dataclass(frozen=True)
+class ButtonSpec:
+    label: str
+    callback_data: str
+
+
+@dataclass(frozen=True)
+class SlotOccurrence:
+    date: str
+    slot_start: str
+    slot_end: str
+
+
+@dataclass(frozen=True)
+class MessageSpec:
+    text: str
+    buttons: tuple[tuple[ButtonSpec, ...], ...] = ()
+
+
+@dataclass
+class OutboundPrompt:
+    message: MessageSpec
+    booking: ManagedBooking | None = None
+    choice: BookingChoice | None = None
+
+
+@dataclass
+class StepResult:
+    prompts: list[OutboundPrompt] = field(default_factory=list)
+
+
+def class_datetime(gym_class: GymClass) -> datetime:
+    class_date = datetime.fromisoformat(gym_class.date).date()
+    start_time = time.fromisoformat(gym_class.startTime)
+    return datetime.combine(class_date, start_time)
+
+
+def get_matching_slot_occurrence(gym_class: GymClass, time_slots: list[TimeSlot]) -> SlotOccurrence | None:
+    class_date = datetime.fromisoformat(gym_class.date).date()
+    weekday = class_date.weekday()
+    class_start = time.fromisoformat(gym_class.startTime)
+    class_end = time.fromisoformat(gym_class.endTime)
+
+    for slot in time_slots:
+        if slot.day_of_week != weekday:
+            continue
+        if slot.start_time <= class_start <= class_end <= slot.end_time:
+            return SlotOccurrence(
+                date=gym_class.date,
+                slot_start=slot.start_time.isoformat(),
+                slot_end=slot.end_time.isoformat(),
+            )
+    return None
+
+
+def group_by_slot(
+    classes: list[GymClass], time_slots: list[TimeSlot]
+) -> dict[SlotOccurrence, list[GymClass]]:
+    grouped: dict[SlotOccurrence, list[GymClass]] = {}
+
+    for gym_class in classes:
+        slot_occurrence = get_matching_slot_occurrence(gym_class, time_slots)
+        if slot_occurrence is None:
+            continue
+        grouped.setdefault(slot_occurrence, []).append(gym_class)
+    return grouped
+
+
+def message_markup(message: MessageSpec) -> InlineKeyboardMarkup | None:
+    if not message.buttons:
+        return None
+    keyboard = []
+    for row in message.buttons:
+        keyboard.append(
+            [InlineKeyboardButton(button.label, callback_data=button.callback_data) for button in row]
+        )
+    return InlineKeyboardMarkup(keyboard)
+
+
+def build_prompt_keyboard(participation_id: str) -> InlineKeyboardMarkup:
+    spec = build_keep_booking_prompt(participation_id, "Please confirm this booking.")
+    markup = message_markup(spec)
+    if markup is None:
+        raise ValueError("Prompt keyboard must have buttons")
+    return markup
+
+
+def build_cancel_keyboard(participation_id: str) -> InlineKeyboardMarkup:
+    spec = build_confirmed_reminder_prompt(participation_id)
+    markup = message_markup(spec)
+    if markup is None:
+        raise ValueError("Cancel keyboard must have buttons")
+    return markup
+
+
+def build_keep_booking_prompt(participation_id: str, text: str) -> MessageSpec:
+    return MessageSpec(
+        text=text,
+        buttons=(
+            (
+                ButtonSpec(label="Accept", callback_data=f"accept:{participation_id}"),
+                ButtonSpec(label="Reject", callback_data=f"reject:{participation_id}"),
+            ),
+        ),
+    )
+
+
+def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
+    return MessageSpec(
+        text="Reminder: your class is coming up soon. If you changed your mind, cancel now.",
+        buttons=((ButtonSpec(label="Cancel now", callback_data=f"cancel:{participation_id}"),),),
+    )
+
+
+def is_cycle_active(session) -> bool:
+    bot_state = get_bot_state(session)
+    return bot_state.is_active
+
+
+async def fetch_candidate_classes(client: PureGymClient, now: datetime) -> list[GymClass]:
+    from_date = now.strftime("%Y-%m-%d")
+    to_date = (now + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d")
+    classes = await client.get_available_classes(
+        class_ids=config.class_preferences.interested_classes,
+        center_ids=config.class_preferences.interested_centers,
+        from_date=from_date,
+        to_date=to_date,
+    )
+    classes = filter_by_time_slots(classes, config.class_preferences.available_time_slots)
+    classes.sort(key=class_datetime)
+    return classes
+
+
+def reconcile_bookings_missing_in_puregym(
+    session,
+    booked_by_participation: dict[str, GymClass],
+    now: datetime,
+) -> StepResult:
+    result = StepResult()
+    active_bookings = get_active_bookings(session)
+
+    for booking in active_bookings:
+        if booking.participation_id in booked_by_participation:
+            continue
+
+        if booking.class_datetime <= now:
+            if booking.status == BookingStatus.CONFIRMED:
+                set_booking_status(session, booking, BookingStatus.ATTENDED)
+            else:
+                set_booking_status(session, booking, BookingStatus.EXPIRED)
+            result.prompts.append(
+                OutboundPrompt(
+                    message=MessageSpec(text="A booking has passed and is now archived."),
+                )
+            )
+        else:
+            set_booking_status(session, booking, BookingStatus.CANCELLED)
+            result.prompts.append(
+                OutboundPrompt(
+                    message=MessageSpec(text="A booking was missing in PureGym and has been cancelled."),
+                )
+            )
+
+    if result.prompts:
+        session.commit()
+    return result
+
+
+def import_untracked_bookings(
+    session,
+    booked_by_participation: dict[str, GymClass],
+) -> StepResult:
+    result = StepResult()
+
+    for participation_id, gym_class in booked_by_participation.items():
+        existing = get_booking_by_participation_id(session, participation_id)
+        if existing is not None:
+            continue
+
+        booking = ManagedBooking(
+            booking_id=gym_class.bookingId,
+            activity_id=gym_class.activityId,
+            payment_type=gym_class.payment_type,
+            participation_id=participation_id,
+            class_datetime=class_datetime(gym_class),
+            status=BookingStatus.PENDING,
+        )
+        add_managed_booking(session, booking)
+        session.commit()
+
+        text = (
+            "Found a booking not tracked by the bot:\n"
+            f"- {gym_class.title} on {gym_class.date} at {gym_class.startTime} "
+            f"({gym_class.location})\n"
+            "Do you want to keep it?"
+        )
+        result.prompts.append(
+            OutboundPrompt(
+                booking=booking,
+                message=build_keep_booking_prompt(participation_id, text),
+            )
+        )
+
+    return result
+
+
+def detect_booking_state_mismatch(
+    session,
+    booked_by_participation: dict[str, GymClass],
+) -> StepResult:
+    db_participation_ids = {
+        booking.participation_id
+        for booking in get_active_bookings(session)
+        if booking.participation_id is not None
+    }
+    puregym_participation_ids = set(booked_by_participation)
+
+    if db_participation_ids == puregym_participation_ids:
+        return StepResult()
+
+    db_only = sorted(db_participation_ids - puregym_participation_ids)
+    puregym_only = sorted(puregym_participation_ids - db_participation_ids)
+    message = (
+        "Booking state mismatch detected after reconciliation. "
+        f"DB active bookings: {len(db_participation_ids)}, "
+        f"PureGym booked classes: {len(puregym_participation_ids)}."
+    )
+    if db_only:
+        message += f" DB-only participation IDs: {', '.join(db_only)}."
+    if puregym_only:
+        message += f" PureGym-only participation IDs: {', '.join(puregym_only)}."
+
+    logging.warning(message)
+    return StepResult(prompts=[OutboundPrompt(message=MessageSpec(text=message))])
+
+
+def slot_is_blocked(session, slot_occurrence: SlotOccurrence) -> bool:
+    pending_choice = get_pending_choice(
+        session,
+        slot_occurrence.date,
+        slot_occurrence.slot_start,
+        slot_occurrence.slot_end,
+    )
+    if pending_choice is not None:
+        return True
+
+    handled_bookings = get_handled_bookings_for_slot(
+        session,
+        slot_occurrence.date,
+        slot_occurrence.slot_start,
+        slot_occurrence.slot_end,
+    )
+    return bool(handled_bookings)
+
+
+def assert_not_booked_in_slot_by_this_point(
+    slot_occurrence: SlotOccurrence,
+    slot_classes: list[GymClass],
+) -> bool:
+    booked_in_slot = [gym_class for gym_class in slot_classes if gym_class.participationId is not None]
+    if not booked_in_slot:
+        return True
+
+    booking_ids = ", ".join(sorted(gym_class.bookingId for gym_class in booked_in_slot))
+    logging.warning(
+        "Skipping slot %s %s-%s because booked classes were found without a blocking DB record: %s",
+        slot_occurrence.date,
+        slot_occurrence.slot_start,
+        slot_occurrence.slot_end,
+        booking_ids,
+    )
+    return False
+
+
+async def handle_slot_booking_actions(
+    session,
+    client: PureGymClient,
+    grouped_by_slot: dict[SlotOccurrence, list[GymClass]],
+    active_count: int,
+) -> StepResult:
+    result = StepResult()
+
+    for slot_occurrence in sorted(
+        grouped_by_slot.keys(),
+        key=lambda item: (item.date, item.slot_start, item.slot_end),
+    ):
+        if active_count >= config.max_bookings:
+            logging.info("Max bookings reached, skipping further booking attempts")
+            break
+
+        if slot_is_blocked(session, slot_occurrence):
+            continue
+
+        slot_classes = grouped_by_slot[slot_occurrence]
+        if not assert_not_booked_in_slot_by_this_point(slot_occurrence, slot_classes):
+            continue
+
+        available = [gym_class for gym_class in slot_classes if gym_class.participationId is None]
+        if not available:
+            continue
+
+        if len(available) == 1:
+            gym_class = available[0]
+            logging.info("Attempting to book class %s", gym_class.bookingId)
+            response = await client.book_class(gym_class)
+            if response.get("status") != "success":
+                logging.info("Booking failed for %s: %s", gym_class.bookingId, response)
+                continue
+
+            participation_id = response.get("participationId")
+            if not participation_id:
+                logging.info(
+                    "Booking response missing participationId for %s: %s",
+                    gym_class.bookingId,
+                    response,
+                )
+                continue
+
+            booking = ManagedBooking(
+                booking_id=gym_class.bookingId,
+                activity_id=gym_class.activityId,
+                payment_type=gym_class.payment_type,
+                participation_id=participation_id,
+                class_datetime=class_datetime(gym_class),
+                status=BookingStatus.PENDING,
+            )
+            add_managed_booking(session, booking)
+            session.commit()
+            active_count += 1
+
+            message = build_keep_booking_prompt(
+                participation_id,
+                text=f"Booked: {gym_class.format()}\nDo you want to keep it?",
+            )
+            result.prompts.append(OutboundPrompt(booking=booking, message=message))
+            continue
+
+        options = []
+        for gym_class in sorted(available, key=class_datetime):
+            options.append(
+                {
+                    "booking_id": gym_class.bookingId,
+                    "activity_id": gym_class.activityId,
+                    "payment_type": gym_class.payment_type,
+                    "title": gym_class.title,
+                    "date": gym_class.date,
+                    "startTime": gym_class.startTime,
+                    "location": gym_class.location,
+                }
+            )
+
+        choice = BookingChoice(
+            slot_date=slot_occurrence.date,
+            slot_start=slot_occurrence.slot_start,
+            slot_end=slot_occurrence.slot_end,
+            options_json=json.dumps(options),
+        )
+        add_booking_choice(session, choice)
+        session.commit()
+
+        lines = ["Multiple classes match this time slot. Pick one to book:"]
+        for idx, option in enumerate(options, start=1):
+            lines.append(
+                f"{idx}. {option['title']} on {option['date']} at {option['startTime']} ({option['location']})"
+            )
+
+        buttons: tuple[tuple[ButtonSpec, ...], ...] = tuple(
+            (
+                ButtonSpec(
+                    label=f"{idx + 1}. {option['startTime']} {option['title']}",
+                    callback_data=f"pick:{choice.id}:{idx}",
+                ),
+            )
+            for idx, option in enumerate(options)
+        )
+        result.prompts.append(
+            OutboundPrompt(
+                choice=choice,
+                message=MessageSpec(text="\n".join(lines), buttons=buttons),
+            )
+        )
+
+    return result
+
+
+def send_due_reminders(session, now: datetime, reminder_hours: int) -> StepResult:
+    result = StepResult()
+    threshold = timedelta(hours=reminder_hours)
+    active_bookings = get_active_bookings(session)
+
+    for booking in active_bookings:
+        if booking.reminder_sent:
+            continue
+
+        time_to_class = booking.class_datetime - now
+        if time_to_class > threshold:
+            continue
+
+        if booking.status == BookingStatus.PENDING and booking.participation_id is not None:
+            result.prompts.append(
+                OutboundPrompt(
+                    booking=booking,
+                    message=build_keep_booking_prompt(
+                        booking.participation_id,
+                        text=("Reminder: you have a pending booking coming up."),
+                    ),
+                )
+            )
+            set_reminder_sent(session, booking)
+            continue
+
+        if booking.status == BookingStatus.CONFIRMED and booking.participation_id is not None:
+            result.prompts.append(
+                OutboundPrompt(
+                    booking=booking,
+                    message=build_confirmed_reminder_prompt(booking.participation_id),
+                )
+            )
+            set_reminder_sent(session, booking)
+
+    if result.prompts:
+        session.commit()
+    return result
+
+
+async def auto_cancel_stale_pending_bookings(
+    session,
+    client: PureGymClient,
+    now: datetime,
+    auto_cancel_hours: int,
+) -> StepResult:
+    result = StepResult()
+    threshold = timedelta(hours=auto_cancel_hours)
+    pending = get_pending_bookings(session)
+
+    for booking in pending:
+        time_to_class = booking.class_datetime - now
+        if time_to_class > threshold:
+            continue
+
+        if booking.participation_id is None:
+            continue
+
+        response = await client.unbook_participation(booking.participation_id)
+        if response.get("status") != "success":
+            logging.info("Failed to auto-cancel booking %s: %s", booking.booking_id, response)
+            continue
+
+        set_booking_status(session, booking, BookingStatus.CANCELLED)
+        result.prompts.append(
+            OutboundPrompt(
+                message=MessageSpec(
+                    text=(f"Pending booking was cancelled {auto_cancel_hours}h before class time.")
+                ),
+            )
+        )
+
+    if result.prompts:
+        session.commit()
+    return result
+
+
+async def publish_prompts(context: ContextTypes.DEFAULT_TYPE, session, prompts: list[OutboundPrompt]) -> None:
+    for prompt in prompts:
+        sent_message = await context.bot.send_message(
+            chat_id=config.telegram_id,
+            text=prompt.message.text,
+            reply_markup=message_markup(prompt.message),
+        )
+
+        if prompt.booking is not None:
+            set_message_id(session, prompt.booking, sent_message.message_id)
+            session.commit()
+
+        if prompt.choice is not None:
+            set_choice_message_id(session, prompt.choice, sent_message.message_id)
+            session.commit()
+
+
+async def run_booking_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
+    now = datetime.now()
+    client = context.bot_data.get("puregym_client")
+    if client is None:
+        raise ValueError("No PureGym client found")
+
+    with get_db_session() as session:
+        if not is_cycle_active(session):
+            logging.info("Booking cycle skipped because bot is inactive")
+            return
+
+    logging.info("Running booking cycle")
+    classes = await fetch_candidate_classes(client, now)
+    booked_classes = filter_by_booked(classes)
+    booked_by_participation = {item.participationId: item for item in booked_classes if item.participationId}
+    grouped = group_by_slot(classes, config.class_preferences.available_time_slots)
+
+    with get_db_session() as session:
+        result = reconcile_bookings_missing_in_puregym(session, booked_by_participation, now)
+        await publish_prompts(context, session, result.prompts)
+
+        result = import_untracked_bookings(session, booked_by_participation)
+        await publish_prompts(context, session, result.prompts)
+
+        result = detect_booking_state_mismatch(session, booked_by_participation)
+        await publish_prompts(context, session, result.prompts)
+
+        active_count = len(get_active_bookings(session))
+        result = await handle_slot_booking_actions(session, client, grouped, active_count)
+        await publish_prompts(context, session, result.prompts)
+
+        result = send_due_reminders(session, now, config.booking_reminder_hours)
+        await publish_prompts(context, session, result.prompts)
+
+        result = await auto_cancel_stale_pending_bookings(
+            session,
+            client,
+            now,
+            config.pending_auto_cancel_hours,
+        )
+        await publish_prompts(context, session, result.prompts)

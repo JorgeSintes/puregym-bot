@@ -1,6 +1,16 @@
 telegram_token: <your_telegram_bot_token_here>
-users:
-  - name: <user_name>
-    telegram_id: <user_telegram_id>
-    puregym_username: <user_puregym_username>
-    puregym_password: <user_puregym_password>
+name: <your_name>
+telegram_id: <your_telegram_id>
+puregym_username: <your_puregym_username>
+puregym_password: <your_puregym_password>
+class_preferences:
+  interested_classes:
+    - <class_id>
+  interested_centers:
+    - <center_id>
+  available_time_slots:
+    - day_of_week: 1
+      start_time: "17:00:00"
+      end_time: "22:00:00"
+booking_reminder_hours: 24
+pending_auto_cancel_hours: 3

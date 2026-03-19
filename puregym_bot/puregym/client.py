@@ -89,9 +89,14 @@ class PureGymClient:
         self,
         class_ids: list[int],
         center_ids: list[int],
-        from_date: str = datetime.today().strftime("%Y-%m-%d"),
-        to_date: str = (datetime.today() + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d"),
+        from_date: str | None = None,
+        to_date: str | None = None,
     ) -> list[GymClass]:
+        if from_date is None:
+            from_date = datetime.today().strftime("%Y-%m-%d")
+        if to_date is None:
+            to_date = (datetime.today() + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d")
+
         data = await self._request_json(
             "GET",
             f"{API_URL}search_activities",
@@ -115,6 +120,17 @@ class PureGymClient:
                 "bookingId": gym_class.bookingId,
                 "activityId": gym_class.activityId,
                 "payment_type": gym_class.payment_type,
+            },
+        )
+
+    async def book_by_ids(self, booking_id: str, activity_id: int, payment_type: str):
+        return await self._request_json(
+            "POST",
+            f"{API_URL}book_activity",
+            data={
+                "bookingId": booking_id,
+                "activityId": activity_id,
+                "payment_type": payment_type,
             },
         )
 
