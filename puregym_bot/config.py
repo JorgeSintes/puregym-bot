@@ -1,6 +1,6 @@
-from functools import lru_cache
 from datetime import time
 from enum import IntEnum
+from functools import lru_cache
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, SecretStr, model_validator
@@ -83,6 +83,7 @@ class Config(BaseSettings):
     max_bookings: int = 18
     booking_reminder_hours: int = 24
     pending_auto_cancel_hours: int = 3
+    booking_interval_seconds: int = 60
 
     model_config = SettingsConfigDict(yaml_file="config.yaml", yaml_file_encoding="utf-8")
 
