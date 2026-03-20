@@ -20,9 +20,7 @@ COMMANDS: list[CommandSpec] = [
     CommandSpec("start", "Enable automatic booking", handlers.start, allow_inactive=True),
     CommandSpec("stop", "Disable automatic booking", handlers.stop, allow_inactive=True),
     CommandSpec("status", "Show automatic booking status", handlers.status, allow_inactive=True),
-    CommandSpec(
-        "booked_classes", "Show your upcoming bookings", handlers.booked_classes, allow_inactive=True
-    ),
+    CommandSpec("booked", "Show your upcoming bookings", handlers.booked_classes, allow_inactive=True),
     CommandSpec("class_ids", "List available class types", handlers.all_class_ids, allow_inactive=True),
     CommandSpec("center_ids", "List available centers", handlers.all_center_ids, allow_inactive=True),
     CommandSpec("run_now", "Run booking cycle immediately", handlers.run_now),
