@@ -72,6 +72,7 @@ class FakePureGymClient:
     def __init__(self, classes):
         self.classes = classes
         self.book_calls: list[str] = []
+        self.book_by_ids_calls: list[tuple[str, int, str]] = []
         self.unbook_calls: list[str] = []
 
     async def get_available_classes(self, **_kwargs):
@@ -80,6 +81,10 @@ class FakePureGymClient:
     async def book_class(self, gym_class: GymClass):
         self.book_calls.append(gym_class.bookingId)
         return {"status": "success", "participationId": f"p-{gym_class.bookingId}"}
+
+    async def book_by_ids(self, booking_id: str, activity_id: int, payment_type: str):
+        self.book_by_ids_calls.append((booking_id, activity_id, payment_type))
+        return {"status": "success", "participationId": f"p-{booking_id}"}
 
     async def unbook_participation(self, participation_id: str):
         self.unbook_calls.append(participation_id)
