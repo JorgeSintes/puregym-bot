@@ -83,7 +83,7 @@ def test_gym_class_format_uses_telegram_date_time_format():
         participation_id="pid-4",
     )
 
-    assert gym_class.format() == "Body Pump on Mon 23/03 09:00 (Main Hall) | cancel by Mon 23/03 06:00"
+    assert gym_class.format() == "Mon 23/03 09:00  Body Pump @ Main Hall | cancel by Mon 23/03 06:00"
 
 
 @pytest.mark.asyncio
@@ -143,8 +143,8 @@ async def test_booked_classes_shows_managed_status_and_waitlist_position(configu
     assert len(context.bot.calls) == 1
     assert context.bot.calls[0]["text"] == (
         "Your upcoming bookings:\n"
-        "- Bike Standard - Mon 23/03 09:00 - PureGym Aarhusgade - confirmed\n"
-        "- Bike Power - Mon 23/03 16:30 - PureGym Aarhusgade - pending - waitlist #40"
+        "- Mon 23/03 09:00  Bike Standard @ PureGym Aarhusgade - confirmed\n"
+        "- Mon 23/03 16:30  Bike Power @ PureGym Aarhusgade - pending, waitlist #40"
     )
 
 
@@ -195,8 +195,8 @@ async def test_booked_classes_hides_stale_managed_bookings(configured_jobs, test
     assert len(context.bot.calls) == 1
     assert context.bot.calls[0]["text"] == (
         "Your upcoming bookings:\n"
-        "- Bike Standard - Mon 23/03 09:00 - PureGym Aarhusgade - pending\n"
-        "- Yoga Flow - Mon 23/03 12:00 - PureGym Aarhusgade - unmanaged - waitlist #7"
+        "- Mon 23/03 09:00  Bike Standard @ PureGym Aarhusgade - pending\n"
+        "- Mon 23/03 12:00  Yoga Flow @ PureGym Aarhusgade - unmanaged, waitlist #7"
     )
 
 

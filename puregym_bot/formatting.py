@@ -20,3 +20,7 @@ def format_telegram_datetime(value: str | datetime) -> str:
 
 def format_telegram_class_time(class_date: str, start_time: str) -> str:
     return f"{format_telegram_date(class_date)} {format_telegram_time(start_time)}"
+
+
+def format_telegram_class_summary(class_date: str, start_time: str, title: str, location: str) -> str:
+    return f"{format_telegram_class_time(class_date, start_time)}  {title} @ {location}"

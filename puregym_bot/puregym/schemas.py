@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, time
 
 from pydantic import BaseModel
 
-from puregym_bot.formatting import format_telegram_class_time, format_telegram_datetime
+from puregym_bot.formatting import format_telegram_class_summary, format_telegram_datetime
 
 WAITLIST_POSITION_PATTERN = re.compile(r"nr\.\s*(\d+)\s+pa\s+ventelisten", re.IGNORECASE)
 WAITLIST_SIZE_PATTERN = re.compile(r"Venteliste\s*\((\d+)\)", re.IGNORECASE)
@@ -106,8 +106,8 @@ class GymClass(BaseModel):
         class_dt = datetime.combine(class_date, start_time)
         cancel_deadline = class_dt - timedelta(hours=3)
         message = (
-            f"{self.title} on {format_telegram_class_time(self.date, self.startTime)} "
-            f"({self.location}) | cancel by {format_telegram_datetime(cancel_deadline)}"
+            f"{format_telegram_class_summary(self.date, self.startTime, self.title, self.location)} "
+            f"| cancel by {format_telegram_datetime(cancel_deadline)}"
         )
         if self.waitlist_position is not None:
             return f"{message} | waitlist #{self.waitlist_position}"

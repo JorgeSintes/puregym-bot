@@ -14,7 +14,10 @@ from puregym_bot.bot.prompts import (
     message_markup,
 )
 from puregym_bot.config import TimeSlot, get_config
-from puregym_bot.formatting import format_telegram_class_time
+from puregym_bot.formatting import (
+    format_telegram_class_summary,
+    format_telegram_time,
+)
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked, filter_by_time_slots
 from puregym_bot.puregym.schemas import GymClass
@@ -171,8 +174,7 @@ def import_untracked_bookings(
 
         text = (
             "Found a booking not tracked by the bot:\n"
-            f"- {gym_class.title} on {format_telegram_class_time(gym_class.date, gym_class.startTime)} "
-            f"({gym_class.location})\n"
+            f"- {format_telegram_class_summary(gym_class.date, gym_class.startTime, gym_class.title, gym_class.location)}\n"
             "Do you want to keep it?"
         )
         result.prompts.append(
@@ -346,8 +348,8 @@ async def handle_slot_booking_actions(
         lines = ["Multiple classes match this time slot. Pick one to book:"]
         for idx, option in enumerate(options, start=1):
             lines.append(
-                f"{idx}. {option['title']} on "
-                f"{format_telegram_class_time(option['date'], option['startTime'])} ({option['location']})"
+                f"{idx}. "
+                f"{format_telegram_class_summary(option['date'], option['startTime'], option['title'], option['location'])}"
             )
 
         buttons: tuple[tuple[ButtonSpec, ...], ...] = tuple(
@@ -355,7 +357,7 @@ async def handle_slot_booking_actions(
                 build_choice_pick_button(
                     choice_id=choice_id,
                     option_index=idx,
-                    label=f"{idx + 1}. {option['startTime']} {option['title']}",
+                    label=f"{idx + 1}. {format_telegram_time(option['startTime'])} {option['title']}",
                 ),
             )
             for idx, option in enumerate(options)

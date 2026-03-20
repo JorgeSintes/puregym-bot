@@ -45,11 +45,11 @@ def managed_booking_label(status: BookingStatus) -> str:
 
 def format_booking_line(gym_class: GymClass, state: str) -> str:
     line = (
-        f"- {gym_class.title} - {format_telegram_class_time(gym_class.date, gym_class.startTime)} - "
-        f"{gym_class.location} - {state}"
+        f"- {format_telegram_class_time(gym_class.date, gym_class.startTime)}  "
+        f"{gym_class.title} @ {gym_class.location} - {state}"
     )
     if gym_class.waitlist_position is not None:
-        return f"{line} - waitlist #{gym_class.waitlist_position}"
+        return f"{line}, waitlist #{gym_class.waitlist_position}"
     return line
 
 

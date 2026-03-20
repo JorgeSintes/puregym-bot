@@ -148,7 +148,7 @@ async def test_button_pick_callback_books_selection_and_sends_follow_up_prompt(
     assert bookings[0].participation_id == "p-b-3"
     assert refreshed_choice is not None
     assert refreshed_choice.status.value == "handled"
-    assert context.bot.calls[0]["text"].startswith("Booked: Body Pump on Mon 23/03 18:00")
+    assert context.bot.calls[0]["text"].startswith("Booked: Mon 23/03 18:00  Body Pump @ Main Hall")
 
 
 @pytest.mark.asyncio
