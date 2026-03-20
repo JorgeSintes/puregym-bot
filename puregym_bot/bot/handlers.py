@@ -5,9 +5,17 @@ from datetime import datetime, time
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from puregym_bot.bot.booking_cycle import build_prompt_keyboard, run_booking_cycle
+from puregym_bot.bot.booking_cycle import run_booking_cycle
+from puregym_bot.bot.callback_data import (
+    BookingCallback,
+    BookingCallbackAction,
+    ChoicePickCallback,
+    parse_callback_data,
+)
 from puregym_bot.bot.dependencies import HandlerContext
-from puregym_bot.config import config
+from puregym_bot.bot.prompts import build_selected_choice_confirmation_prompt, message_markup
+from puregym_bot.config import get_config
+from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
@@ -31,6 +39,7 @@ async def start(
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
+    config = get_config()
     if update.effective_chat is None or update.effective_user is None:
         return
     set_bot_active(ctx.session, True)
@@ -50,6 +59,7 @@ async def stop(
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
+    config = get_config()
     if update.effective_chat is None:
         return
 
@@ -87,6 +97,7 @@ async def button(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    config = get_config()
     query = update.callback_query
     if query is None or update.effective_user is None:
         return
@@ -97,105 +108,162 @@ async def button(
     # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
     await query.answer()
 
-    data = query.data or ""
-    if data.startswith("accept:") or data.startswith("reject:") or data.startswith("cancel:"):
-        action, participation_id = data.split(":", 1)
-        with get_db_session() as session:
-            booking = get_booking_by_participation_id(session, participation_id)
-            if booking is None:
-                return
-
-            if action in {"accept", "reject"} and booking.status != BookingStatus.PENDING:
-                await query.edit_message_text(text="This booking has already been handled.")
-                return
-
-            if action == "cancel" and booking.status not in {
-                BookingStatus.PENDING,
-                BookingStatus.CONFIRMED,
-            }:
-                await query.edit_message_text(text="This booking can no longer be cancelled.")
-                return
-
-            if action == "accept":
-                set_booking_status(session, booking, BookingStatus.CONFIRMED)
-                session.commit()
-                await query.edit_message_text(text="Booking accepted.")
-                return
-
-            client = context.bot_data.get("puregym_client")
-            if client is None:
-                return
-            resp = await client.unbook_participation(participation_id)
-            if resp.get("status") == "success":
-                set_booking_status(session, booking, BookingStatus.CANCELLED)
-                session.commit()
-                await query.edit_message_text(text="Booking cancelled.")
-            else:
-                logging.debug("Failed to cancel booking %s: %s", participation_id, resp)
-                await query.edit_message_text(text="Failed to cancel. I will retry later.")
+    parsed = parse_callback_data(query.data or "")
+    if parsed is None:
+        await query.edit_message_text(text="This action is no longer available.")
         return
 
-    if data.startswith("pick:"):
-        _, choice_id_str, idx_str = data.split(":", 2)
-        with get_db_session() as session:
-            choice = get_choice_by_id(session, int(choice_id_str))
-            if choice is None:
-                return
-            if choice.status != ChoiceStatus.PENDING:
-                await query.edit_message_text(text="This selection has already been handled.")
-                return
+    if isinstance(parsed, BookingCallback):
+        if parsed.action == BookingCallbackAction.CANCEL:
+            await handle_booking_cancel_callback(update, context, parsed)
+            return
 
-            options = json.loads(choice.options_json)
-            idx = int(idx_str)
-            if idx < 0 or idx >= len(options):
-                return
-            selected = options[idx]
+        await handle_booking_decision_callback(update, context, parsed)
+        return
 
-            client = context.bot_data.get("puregym_client")
-            if client is None:
-                return
+    await handle_choice_pick_callback(context, update, parsed)
 
-            resp = await client.book_by_ids(
-                selected["booking_id"],
-                selected["activity_id"],
-                selected["payment_type"],
-            )
-            if resp.get("status") != "success":
-                logging.debug("Failed to book selected option: %s", resp)
-                await query.edit_message_text(text="Failed to book that option. Please choose another.")
-                return
 
-            participation_id = resp.get("participationId")
-            if not participation_id:
-                await query.edit_message_text(
-                    text="Booking succeeded but response was incomplete. Please try again."
-                )
-                return
+def get_puregym_client(context: ContextTypes.DEFAULT_TYPE) -> PureGymClient | None:
+    client = context.bot_data.get("puregym_client")
+    if client is None:
+        return None
+    return client
 
-            booking = ManagedBooking(
-                booking_id=selected["booking_id"],
-                activity_id=selected["activity_id"],
-                payment_type=selected["payment_type"],
-                participation_id=participation_id,
-                class_datetime=option_datetime(selected),
-                status=BookingStatus.PENDING,
-            )
-            session.add(booking)
-            set_choice_status(session, choice, ChoiceStatus.HANDLED)
+
+async def handle_booking_decision_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    callback: BookingCallback,
+) -> None:
+    query = update.callback_query
+    if query is None:
+        return
+
+    with get_db_session() as session:
+        booking = get_booking_by_participation_id(session, callback.participation_id)
+        if booking is None or booking.status != BookingStatus.PENDING:
+            await query.edit_message_text(text="This booking has already been handled.")
+            return
+
+        if callback.action == BookingCallbackAction.ACCEPT:
+            set_booking_status(session, booking, BookingStatus.CONFIRMED)
             session.commit()
+            await query.edit_message_text(text="Booking accepted.")
+            return
 
-            await query.edit_message_text(text="Booked your selection. Please accept or reject.")
-            await context.bot.send_message(
-                chat_id=config.telegram_id,
-                text=(
-                    f"Booked: {selected['title']} on {selected['date']} at {selected['startTime']} "
-                    f"({selected['location']})\nDo you want to keep it?"
-                ),
-                reply_markup=build_prompt_keyboard(participation_id),
-            )
+        client = get_puregym_client(context)
+        await cancel_booking_from_callback(session, query, callback.participation_id, client)
+
+
+async def handle_booking_cancel_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    callback: BookingCallback,
+) -> None:
+    query = update.callback_query
+    if query is None:
         return
 
-    await query.edit_message_text(text=f"Selected option: {query.data}")
+    with get_db_session() as session:
+        client = get_puregym_client(context)
+        await cancel_booking_from_callback(session, query, callback.participation_id, client)
+
+
+async def cancel_booking_from_callback(
+    session, query, participation_id: str, client: PureGymClient | None
+) -> None:
+    booking = get_booking_by_participation_id(session, participation_id)
+    if booking is None:
+        await query.edit_message_text(text="This booking can no longer be cancelled.")
+        return
+
+    if booking.status not in {BookingStatus.PENDING, BookingStatus.CONFIRMED}:
+        await query.edit_message_text(text="This booking can no longer be cancelled.")
+        return
+
+    if client is None:
+        return
+
+    resp = await client.unbook_participation(participation_id)
+    if resp.get("status") == "success":
+        set_booking_status(session, booking, BookingStatus.CANCELLED)
+        session.commit()
+        await query.edit_message_text(text="Booking cancelled.")
+        return
+
+    logging.debug("Failed to cancel booking %s: %s", participation_id, resp)
+    await query.edit_message_text(text="Failed to cancel!")
+
+
+async def handle_choice_pick_callback(
+    context: ContextTypes.DEFAULT_TYPE,
+    update: Update,
+    callback: ChoicePickCallback,
+) -> None:
+    config = get_config()
+    query = update.callback_query
+    if query is None:
+        return
+
+    with get_db_session() as session:
+        choice = get_choice_by_id(session, callback.choice_id)
+        if choice is None or choice.status != ChoiceStatus.PENDING:
+            await query.edit_message_text(text="This selection has already been handled.")
+            return
+
+        options = json.loads(choice.options_json)
+        if callback.option_index >= len(options):
+            await query.edit_message_text(text="This action is no longer available.")
+            return
+        selected = options[callback.option_index]
+
+        client = get_puregym_client(context)
+        if client is None:
+            return
+
+        resp = await client.book_by_ids(
+            selected["booking_id"],
+            selected["activity_id"],
+            selected["payment_type"],
+        )
+        if resp.get("status") != "success":
+            logging.debug("Failed to book selected option: %s", resp)
+            await query.edit_message_text(text="Failed to book that option. Please choose another.")
+            return
+
+        participation_id = resp.get("participationId")
+        if not participation_id:
+            await query.edit_message_text(
+                text="Booking succeeded but response was incomplete. Please try again."
+            )
+            return
+
+        booking = ManagedBooking(
+            booking_id=selected["booking_id"],
+            activity_id=selected["activity_id"],
+            payment_type=selected["payment_type"],
+            participation_id=participation_id,
+            class_datetime=option_datetime(selected),
+            status=BookingStatus.PENDING,
+        )
+        session.add(booking)
+        set_choice_status(session, choice, ChoiceStatus.HANDLED)
+        session.commit()
+
+        follow_up_message = build_selected_choice_confirmation_prompt(
+            title=selected["title"],
+            class_date=selected["date"],
+            start_time=selected["startTime"],
+            location=selected["location"],
+            participation_id=participation_id,
+        )
+        await query.edit_message_text(text="Booked your selection. Please accept or reject.")
+        await context.bot.send_message(
+            chat_id=config.telegram_id,
+            text=follow_up_message.text,
+            reply_markup=message_markup(follow_up_message),
+        )
 
 
 async def booked_classes(
@@ -203,6 +271,7 @@ async def booked_classes(
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
+    config = get_config()
     if update.effective_chat is None:
         return
 

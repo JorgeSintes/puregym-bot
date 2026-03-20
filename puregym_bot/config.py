@@ -1,8 +1,9 @@
+from functools import lru_cache
 from datetime import time
 from enum import IntEnum
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, Field, SecretStr, ValidationError, model_validator
+from pydantic import AfterValidator, BaseModel, Field, SecretStr, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -13,19 +14,19 @@ from pydantic_settings import (
 
 def valid_str(value: str) -> str:
     if value == "":
-        raise ValidationError("Field not set")
+        raise ValueError("Field not set")
     return value
 
 
 def valid_secret(value: SecretStr) -> SecretStr:
     if value.get_secret_value() == "":
-        raise ValidationError("Field not set")
+        raise ValueError("Field not set")
     return value
 
 
 def valid_list(value: list) -> list:
     if len(value) == 0:
-        raise ValidationError("Field not set")
+        raise ValueError("Field not set")
     return value
 
 
@@ -97,4 +98,10 @@ class Config(BaseSettings):
         return (YamlConfigSettingsSource(settings_cls),)  # type: ignore
 
 
-config = Config()  # type: ignore[call-arg]
+@lru_cache(maxsize=1)
+def get_config() -> Config:
+    return Config()  # type: ignore[call-arg]
+
+
+def clear_config_cache() -> None:
+    get_config.cache_clear()

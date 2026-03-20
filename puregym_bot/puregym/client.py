@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import httpx
 from bs4 import BeautifulSoup
 
-from puregym_bot.config import config
+from puregym_bot.config import get_config
 from puregym_bot.puregym.schemas import CenterGroup, GymClass, GymClassTypesGroup
 
 BASE_URL = "https://www.puregym.dk/"
@@ -95,6 +95,7 @@ class PureGymClient:
         if from_date is None:
             from_date = datetime.today().strftime("%Y-%m-%d")
         if to_date is None:
+            config = get_config()
             to_date = (datetime.today() + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d")
 
         data = await self._request_json(

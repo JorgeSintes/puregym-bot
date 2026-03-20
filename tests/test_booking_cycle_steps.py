@@ -5,6 +5,7 @@ import pytest
 from sqlmodel import Session, select
 
 from puregym_bot.bot import booking_cycle
+from puregym_bot.bot.callback_data import BookingCallback, BookingCallbackAction
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.storage.models import BookingChoice, BookingStatus, BotState, ManagedBooking
 from tests.fakes import FakePureGymClient, make_gym_class
@@ -79,7 +80,13 @@ def test_import_untracked_bookings_creates_pending_and_prompt(configured_jobs, t
         assert prompt.booking is not None
         assert prompt.booking.status == BookingStatus.PENDING
         assert "Do you want to keep it?" in prompt.message.text
-        assert prompt.message.buttons[0][0].callback_data == "accept:pid-manual"
+        assert (
+            prompt.message.buttons[0][0].callback_data
+            == BookingCallback(
+                action=BookingCallbackAction.ACCEPT,
+                participation_id="pid-manual",
+            ).to_callback_data()
+        )
 
 
 def test_detect_booking_state_mismatch_warns_and_prompts(configured_jobs, test_engine, caplog):
@@ -177,7 +184,7 @@ async def test_handle_slot_booking_actions_single_and_multiple(configured_jobs, 
     )
 
     grouped = booking_cycle.group_by_slot(
-        [single, option1, option2], booking_cycle.config.class_preferences.available_time_slots
+        [single, option1, option2], booking_cycle.get_config().class_preferences.available_time_slots
     )
     client = FakePureGymClient([])
 
@@ -218,7 +225,7 @@ async def test_handle_slot_booking_actions_skips_handled_slot(configured_jobs, t
         participation_id=None,
     )
     grouped = booking_cycle.group_by_slot(
-        [single], booking_cycle.config.class_preferences.available_time_slots
+        [single], booking_cycle.get_config().class_preferences.available_time_slots
     )
     client = FakePureGymClient([])
 
@@ -270,7 +277,7 @@ async def test_handle_slot_booking_actions_warns_and_skips_when_booked_class_has
         participation_id=None,
     )
     grouped = booking_cycle.group_by_slot(
-        [booked, available], booking_cycle.config.class_preferences.available_time_slots
+        [booked, available], booking_cycle.get_config().class_preferences.available_time_slots
     )
     client = FakePureGymClient([])
 
@@ -321,8 +328,20 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
             for row in prompt.message.buttons
             for button in row
         }
-        assert "accept:pid-pending" in callbacks
-        assert "cancel:pid-confirmed" in callbacks
+        assert (
+            BookingCallback(
+                action=BookingCallbackAction.ACCEPT,
+                participation_id="pid-pending",
+            ).to_callback_data()
+            in callbacks
+        )
+        assert (
+            BookingCallback(
+                action=BookingCallbackAction.CANCEL,
+                participation_id="pid-confirmed",
+            ).to_callback_data()
+            in callbacks
+        )
 
         refreshed_pending = session.get(ManagedBooking, pending.id)
         refreshed_confirmed = session.get(ManagedBooking, confirmed.id)

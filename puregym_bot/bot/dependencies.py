@@ -3,14 +3,12 @@ from typing import Awaitable, Callable, cast
 
 from sqlmodel import Session
 from telegram import Update
-from telegram.ext import ContextTypes, filters
+from telegram.ext import ContextTypes
 
-from puregym_bot.config import config
+from puregym_bot.config import get_config
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.repository import get_bot_state
-
-AUTH_FILTER = filters.User([config.telegram_id])
 
 
 @dataclass
@@ -21,6 +19,7 @@ class HandlerContext:
 
 
 async def on_startup(app):
+    config = get_config()
     app.bot_data["puregym_client"] = PureGymClient(
         config.puregym_username,
         config.puregym_password.get_secret_value(),
@@ -39,6 +38,7 @@ def build_handler(
     allow_inactive: bool = False,
 ):
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        config = get_config()
         if update.effective_user is None or update.effective_chat is None:
             return
         if update.effective_user.id != config.telegram_id:
