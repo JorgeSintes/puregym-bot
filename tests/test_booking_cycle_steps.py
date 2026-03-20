@@ -79,6 +79,10 @@ def test_import_untracked_bookings_creates_pending_and_prompt(configured_jobs, t
         prompt = result.prompts[0]
         assert prompt.booking is not None
         assert prompt.booking.status == BookingStatus.PENDING
+        assert prompt.message.text.startswith(
+            "Found a booking not tracked by the bot:\n- Mon 23/03 18:00  Body Pump @ Main Hall"
+        )
+        assert "Mon 23/03 18:00" in prompt.message.text
         assert "Do you want to keep it?" in prompt.message.text
         assert (
             prompt.message.buttons[0][0].callback_data
@@ -201,6 +205,12 @@ async def test_handle_slot_booking_actions_single_and_multiple(configured_jobs, 
         choice_prompts = [p for p in result.prompts if p.choice is not None]
         assert len(booking_prompts) == 1
         assert len(choice_prompts) == 1
+        assert booking_prompts[0].message.text.startswith("Booked: Mon 23/03 18:00  Body Pump @ Main Hall")
+        assert "1. Tue 24/03 18:00  Body Pump @ Main Hall" in choice_prompts[0].message.text
+        assert "2. Tue 24/03 19:00  Body Pump @ Main Hall" in choice_prompts[0].message.text
+        assert "Mon 23/03 18:00" in booking_prompts[0].message.text
+        assert "Tue 24/03 18:00" in choice_prompts[0].message.text
+        assert "Tue 24/03 19:00" in choice_prompts[0].message.text
 
         all_bookings = list(session.exec(select(ManagedBooking)).all())
         all_choices = list(session.exec(select(BookingChoice)).all())

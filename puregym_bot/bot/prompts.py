@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from puregym_bot.bot.callback_data import BookingCallback, BookingCallbackAction, ChoicePickCallback
+from puregym_bot.formatting import format_telegram_class_summary
 
 
 @dataclass(frozen=True)
@@ -52,13 +53,13 @@ def build_keep_booking_prompt(participation_id: str, text: str) -> MessageSpec:
     )
 
 
-def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
+def build_cancel_booking_prompt(participation_id: str, text: str) -> MessageSpec:
     return MessageSpec(
-        text="Reminder: your class is coming up soon. If you changed your mind, cancel now.",
+        text=text,
         buttons=(
             (
                 ButtonSpec(
-                    label="Cancel now",
+                    label="Cancel",
                     callback_data=BookingCallback(
                         action=BookingCallbackAction.CANCEL,
                         participation_id=participation_id,
@@ -66,6 +67,17 @@ def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
                 ),
             ),
         ),
+    )
+
+
+def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
+    prompt = build_cancel_booking_prompt(
+        participation_id,
+        text="Reminder: your class is coming up soon. If you changed your mind, cancel now.",
+    )
+    return MessageSpec(
+        text=prompt.text,
+        buttons=((ButtonSpec(label="Cancel now", callback_data=prompt.buttons[0][0].callback_data),),),
     )
 
 
@@ -78,7 +90,10 @@ def build_selected_choice_confirmation_prompt(
 ) -> MessageSpec:
     return build_keep_booking_prompt(
         participation_id,
-        text=f"Booked: {title} on {class_date} at {start_time} ({location})\nDo you want to keep it?",
+        text=(
+            f"Booked: {format_telegram_class_summary(class_date, start_time, title, location)}\n"
+            "Do you want to keep it?"
+        ),
     )
 
 

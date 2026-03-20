@@ -7,6 +7,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot import dependencies
+from puregym_bot.bot.registry import COMMANDS
 from puregym_bot.storage.models import BotState
 
 
@@ -82,3 +83,10 @@ async def test_build_handler_allows_informational_commands_while_inactive(
 
     assert seen_bot_active is False
     assert context.bot.calls == []
+
+
+def test_manage_bookings_command_is_registered_and_informational():
+    command = next(spec for spec in COMMANDS if spec.name == "manage_bookings")
+
+    assert command.description == "Review and manage upcoming bookings"
+    assert command.allow_inactive is True

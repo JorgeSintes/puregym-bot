@@ -1,5 +1,6 @@
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, time
 
 from telegram import Update
@@ -13,13 +14,21 @@ from puregym_bot.bot.callback_data import (
     parse_callback_data,
 )
 from puregym_bot.bot.dependencies import HandlerContext
-from puregym_bot.bot.prompts import build_selected_choice_confirmation_prompt, message_markup
+from puregym_bot.bot.prompts import (
+    build_cancel_booking_prompt,
+    build_keep_booking_prompt,
+    build_selected_choice_confirmation_prompt,
+    message_markup,
+)
 from puregym_bot.config import get_config
+from puregym_bot.formatting import format_telegram_class_time
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked
+from puregym_bot.puregym.schemas import GymClass
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
 from puregym_bot.storage.repository import (
+    get_active_bookings,
     get_booking_by_participation_id,
     get_choice_by_id,
     set_booking_status,
@@ -28,10 +37,62 @@ from puregym_bot.storage.repository import (
 )
 
 
+@dataclass(frozen=True)
+class ActionableBooking:
+    gym_class: GymClass
+    managed_booking: ManagedBooking | None
+
+
 def option_datetime(option: dict) -> datetime:
     class_date = datetime.fromisoformat(option["date"]).date()
     start_time = time.fromisoformat(option["startTime"])
     return datetime.combine(class_date, start_time)
+
+
+def managed_booking_label(status: BookingStatus) -> str:
+    if status == BookingStatus.CONFIRMED:
+        return "confirmed"
+    return status.value
+
+
+def booking_state_label(managed_booking: ManagedBooking | None) -> str:
+    if managed_booking is None:
+        return "external"
+    return managed_booking_label(managed_booking.status)
+
+
+def format_booking_line(gym_class: GymClass, state: str) -> str:
+    line = (
+        f"- {format_telegram_class_time(gym_class.date, gym_class.startTime)}  "
+        f"{gym_class.title} @ {gym_class.location} - {state}"
+    )
+    if gym_class.waitlist_position is not None:
+        return f"{line}, waitlist #{gym_class.waitlist_position}"
+    return line
+
+
+def chunk_message_lines(header: str, lines: list[str], max_length: int = 4000) -> list[str]:
+    chunks: list[str] = []
+    current = header
+
+    for line in lines:
+        candidate = f"{current}\n{line}"
+        if len(candidate) <= max_length:
+            current = candidate
+            continue
+
+        if current != header:
+            chunks.append(current)
+            current = line
+        else:
+            chunks.append(candidate)
+            current = header
+
+    if current == header:
+        return chunks
+
+    chunks.append(current)
+    return chunks
 
 
 async def start(
@@ -174,11 +235,7 @@ async def cancel_booking_from_callback(
     session, query, participation_id: str, client: PureGymClient | None
 ) -> None:
     booking = get_booking_by_participation_id(session, participation_id)
-    if booking is None:
-        await query.edit_message_text(text="This booking can no longer be cancelled.")
-        return
-
-    if booking.status not in {BookingStatus.PENDING, BookingStatus.CONFIRMED}:
+    if booking is not None and booking.status not in {BookingStatus.PENDING, BookingStatus.CONFIRMED}:
         await query.edit_message_text(text="This booking can no longer be cancelled.")
         return
 
@@ -187,8 +244,9 @@ async def cancel_booking_from_callback(
 
     resp = await client.unbook_participation(participation_id)
     if resp.get("status") == "success":
-        set_booking_status(session, booking, BookingStatus.CANCELLED)
-        session.commit()
+        if booking is not None:
+            set_booking_status(session, booking, BookingStatus.CANCELLED)
+            session.commit()
         await query.edit_message_text(text="Booking cancelled.")
         return
 
@@ -266,30 +324,178 @@ async def handle_choice_pick_callback(
         )
 
 
+async def get_live_booked_classes(ctx: HandlerContext) -> list[GymClass]:
+    config = get_config()
+    return filter_by_booked(
+        await ctx.client.get_available_classes(
+            class_ids=config.class_preferences.interested_classes,
+            center_ids=config.class_preferences.interested_centers,
+        )
+    )
+
+
+def build_managed_booking_lookup(
+    active_bookings: list[ManagedBooking],
+) -> tuple[dict[str, ManagedBooking], dict[str, ManagedBooking]]:
+    managed_by_participation = {
+        booking.participation_id: booking
+        for booking in active_bookings
+        if booking.participation_id is not None
+    }
+    managed_by_booking_id = {booking.booking_id: booking for booking in active_bookings}
+    return managed_by_participation, managed_by_booking_id
+
+
+def get_managed_booking(
+    gym_class: GymClass,
+    managed_by_participation: dict[str, ManagedBooking],
+    managed_by_booking_id: dict[str, ManagedBooking],
+) -> ManagedBooking | None:
+    managed_booking = None
+    if gym_class.participationId is not None:
+        managed_booking = managed_by_participation.get(gym_class.participationId)
+    if managed_booking is None:
+        managed_booking = managed_by_booking_id.get(gym_class.bookingId)
+    return managed_booking
+
+
+def build_actionable_bookings(
+    bookings: list[GymClass], active_bookings: list[ManagedBooking]
+) -> list[ActionableBooking]:
+    managed_by_participation, managed_by_booking_id = build_managed_booking_lookup(active_bookings)
+    actionable: list[ActionableBooking] = []
+
+    for gym_class in sorted(bookings, key=lambda booking: (booking.date, booking.startTime)):
+        managed_booking = get_managed_booking(
+            gym_class,
+            managed_by_participation,
+            managed_by_booking_id,
+        )
+        if gym_class.participationId is None:
+            continue
+        if managed_booking is None or managed_booking.status in {
+            BookingStatus.PENDING,
+            BookingStatus.CONFIRMED,
+        }:
+            actionable.append(ActionableBooking(gym_class=gym_class, managed_booking=managed_booking))
+
+    return actionable
+
+
+def build_manage_booking_prompt(actionable_booking: ActionableBooking):
+    gym_class = actionable_booking.gym_class
+    participation_id = gym_class.participationId
+    if participation_id is None:
+        raise ValueError("Actionable bookings must have a participationId")
+
+    if actionable_booking.managed_booking is None:
+        return build_cancel_booking_prompt(
+            participation_id,
+            text=f"External booking:\n{gym_class.format()}\nCancel it if you no longer want it.",
+        )
+
+    if actionable_booking.managed_booking.status == BookingStatus.PENDING:
+        return build_keep_booking_prompt(
+            participation_id,
+            text=f"Pending booking:\n{gym_class.format()}\nAccept to keep it or reject to cancel it.",
+        )
+
+    return build_cancel_booking_prompt(
+        participation_id,
+        text=f"Confirmed booking:\n{gym_class.format()}\nCancel it if you no longer want it.",
+    )
+
+
+def build_manage_summary(actionable_bookings: list[ActionableBooking]) -> str:
+    pending_count = sum(
+        1
+        for item in actionable_bookings
+        if item.managed_booking is not None and item.managed_booking.status == BookingStatus.PENDING
+    )
+    cancellable_count = len(actionable_bookings) - pending_count
+
+    parts: list[str] = []
+    if pending_count == 1:
+        parts.append("1 pending booking to review")
+    elif pending_count > 1:
+        parts.append(f"{pending_count} pending bookings to review")
+
+    if cancellable_count == 1:
+        parts.append("1 booking you can cancel")
+    elif cancellable_count > 1:
+        parts.append(f"{cancellable_count} bookings you can cancel")
+
+    return ", ".join(parts).capitalize() + "."
+
+
 async def booked_classes(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
-    config = get_config()
     if update.effective_chat is None:
         return
 
-    bookings = await ctx.client.get_available_classes(
-        class_ids=config.class_preferences.interested_classes,
-        center_ids=config.class_preferences.interested_centers,
+    bookings = await get_live_booked_classes(ctx)
+    active_bookings = get_active_bookings(ctx.session)
+
+    bookings_by_booking_id = {booking.bookingId: booking for booking in bookings}
+    managed_by_participation, managed_by_booking_id = build_managed_booking_lookup(active_bookings)
+
+    live_bookings = sorted(
+        bookings_by_booking_id.values(), key=lambda booking: (booking.date, booking.startTime)
     )
-    bookings = filter_by_booked(bookings)
-    if not bookings:
+    lines: list[str] = []
+    for gym_class in live_bookings:
+        managed_booking = get_managed_booking(
+            gym_class,
+            managed_by_participation,
+            managed_by_booking_id,
+        )
+
+        state = booking_state_label(managed_booking)
+        lines.append(format_booking_line(gym_class, state))
+
+    if len(live_bookings) == 0:
         await context.bot.send_message(
             chat_id=update.effective_chat.id, text="You have no upcoming bookings."
         )
         return
 
-    message = "Your upcoming bookings:\n"
-    for booking in bookings:
-        message += f"- {booking.format()}\n"
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+    for chunk in chunk_message_lines("Your upcoming bookings:", lines):
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
+
+
+async def manage_bookings(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    ctx: HandlerContext,
+):
+    if update.effective_chat is None:
+        return
+
+    bookings = await get_live_booked_classes(ctx)
+    active_bookings = get_active_bookings(ctx.session)
+    actionable_bookings = build_actionable_bookings(bookings, active_bookings)
+
+    if not actionable_bookings:
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Nothing to manage right now.",
+        )
+        return
+
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=build_manage_summary(actionable_bookings),
+    )
+    for actionable_booking in actionable_bookings:
+        prompt = build_manage_booking_prompt(actionable_booking)
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=prompt.text,
+            reply_markup=message_markup(prompt),
+        )
 
 
 async def all_class_ids(
