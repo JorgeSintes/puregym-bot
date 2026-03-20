@@ -15,11 +15,14 @@ from puregym_bot.bot.callback_data import (
 from puregym_bot.bot.dependencies import HandlerContext
 from puregym_bot.bot.prompts import build_selected_choice_confirmation_prompt, message_markup
 from puregym_bot.config import get_config
+from puregym_bot.formatting import format_telegram_class_time
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked
+from puregym_bot.puregym.schemas import GymClass
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
 from puregym_bot.storage.repository import (
+    get_active_bookings,
     get_booking_by_participation_id,
     get_choice_by_id,
     set_booking_status,
@@ -32,6 +35,46 @@ def option_datetime(option: dict) -> datetime:
     class_date = datetime.fromisoformat(option["date"]).date()
     start_time = time.fromisoformat(option["startTime"])
     return datetime.combine(class_date, start_time)
+
+
+def managed_booking_label(status: BookingStatus) -> str:
+    if status == BookingStatus.CONFIRMED:
+        return "confirmed"
+    return status.value
+
+
+def format_booking_line(gym_class: GymClass, state: str) -> str:
+    line = (
+        f"- {gym_class.title} - {format_telegram_class_time(gym_class.date, gym_class.startTime)} - "
+        f"{gym_class.location} - {state}"
+    )
+    if gym_class.waitlist_position is not None:
+        return f"{line} - waitlist #{gym_class.waitlist_position}"
+    return line
+
+
+def chunk_message_lines(header: str, lines: list[str], max_length: int = 4000) -> list[str]:
+    chunks: list[str] = []
+    current = header
+
+    for line in lines:
+        candidate = f"{current}\n{line}"
+        if len(candidate) <= max_length:
+            current = candidate
+            continue
+
+        if current != header:
+            chunks.append(current)
+            current = line
+        else:
+            chunks.append(candidate)
+            current = header
+
+    if current == header:
+        return chunks
+
+    chunks.append(current)
+    return chunks
 
 
 async def start(
@@ -275,21 +318,49 @@ async def booked_classes(
     if update.effective_chat is None:
         return
 
-    bookings = await ctx.client.get_available_classes(
-        class_ids=config.class_preferences.interested_classes,
-        center_ids=config.class_preferences.interested_centers,
+    bookings = filter_by_booked(
+        await ctx.client.get_available_classes(
+            class_ids=config.class_preferences.interested_classes,
+            center_ids=config.class_preferences.interested_centers,
+        )
     )
-    bookings = filter_by_booked(bookings)
-    if not bookings:
+    active_bookings = get_active_bookings(ctx.session)
+
+    bookings_by_participation = {
+        booking.participationId: booking for booking in bookings if booking.participationId is not None
+    }
+    bookings_by_booking_id = {booking.bookingId: booking for booking in bookings}
+    managed_by_participation = {
+        booking.participation_id: booking
+        for booking in active_bookings
+        if booking.participation_id is not None
+    }
+    managed_by_booking_id = {booking.booking_id: booking for booking in active_bookings}
+
+    live_bookings = sorted(
+        bookings_by_booking_id.values(), key=lambda booking: (booking.date, booking.startTime)
+    )
+    lines: list[str] = []
+    for gym_class in live_bookings:
+        managed_booking = None
+        if gym_class.participationId is not None:
+            managed_booking = managed_by_participation.get(gym_class.participationId)
+        if managed_booking is None:
+            managed_booking = managed_by_booking_id.get(gym_class.bookingId)
+
+        state = "unmanaged"
+        if managed_booking is not None:
+            state = managed_booking_label(managed_booking.status)
+        lines.append(format_booking_line(gym_class, state))
+
+    if len(live_bookings) == 0:
         await context.bot.send_message(
             chat_id=update.effective_chat.id, text="You have no upcoming bookings."
         )
         return
 
-    message = "Your upcoming bookings:\n"
-    for booking in bookings:
-        message += f"- {booking.format()}\n"
-    await context.bot.send_message(chat_id=update.effective_chat.id, text=message)
+    for chunk in chunk_message_lines("Your upcoming bookings:", lines):
+        await context.bot.send_message(chat_id=update.effective_chat.id, text=chunk)
 
 
 async def all_class_ids(

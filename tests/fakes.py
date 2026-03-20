@@ -16,6 +16,7 @@ def make_gym_class(
     location: str = "Main Hall",
     center_name: str = "Center 1",
     payment_type: str = "membership",
+    button: dict | None = None,
 ) -> GymClass:
     return GymClass.model_validate(
         {
@@ -34,7 +35,7 @@ def make_gym_class(
             "duration": 60,
             "activityUrl": "https://example.com/activity",
             "level": {},
-            "button": {},
+            "button": button or {},
         }
     )
 

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
 from puregym_bot.bot.callback_data import BookingCallback, BookingCallbackAction, ChoicePickCallback
+from puregym_bot.formatting import format_telegram_class_time
 
 
 @dataclass(frozen=True)
@@ -78,7 +79,10 @@ def build_selected_choice_confirmation_prompt(
 ) -> MessageSpec:
     return build_keep_booking_prompt(
         participation_id,
-        text=f"Booked: {title} on {class_date} at {start_time} ({location})\nDo you want to keep it?",
+        text=(
+            f"Booked: {title} on {format_telegram_class_time(class_date, start_time)} "
+            f"({location})\nDo you want to keep it?"
+        ),
     )
 
 
