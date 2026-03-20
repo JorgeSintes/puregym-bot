@@ -3,9 +3,16 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
+from puregym_bot.bot.prompts import (
+    ButtonSpec,
+    MessageSpec,
+    build_choice_pick_button,
+    build_confirmed_reminder_prompt,
+    build_keep_booking_prompt,
+    message_markup,
+)
 from puregym_bot.config import TimeSlot, config
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked, filter_by_time_slots
@@ -29,22 +36,10 @@ from puregym_bot.storage.repository import (
 
 
 @dataclass(frozen=True)
-class ButtonSpec:
-    label: str
-    callback_data: str
-
-
-@dataclass(frozen=True)
 class SlotOccurrence:
     date: str
     slot_start: str
     slot_end: str
-
-
-@dataclass(frozen=True)
-class MessageSpec:
-    text: str
-    buttons: tuple[tuple[ButtonSpec, ...], ...] = ()
 
 
 @dataclass
@@ -94,52 +89,6 @@ def group_by_slot(
             continue
         grouped.setdefault(slot_occurrence, []).append(gym_class)
     return grouped
-
-
-def message_markup(message: MessageSpec) -> InlineKeyboardMarkup | None:
-    if not message.buttons:
-        return None
-    keyboard = []
-    for row in message.buttons:
-        keyboard.append(
-            [InlineKeyboardButton(button.label, callback_data=button.callback_data) for button in row]
-        )
-    return InlineKeyboardMarkup(keyboard)
-
-
-def build_prompt_keyboard(participation_id: str) -> InlineKeyboardMarkup:
-    spec = build_keep_booking_prompt(participation_id, "Please confirm this booking.")
-    markup = message_markup(spec)
-    if markup is None:
-        raise ValueError("Prompt keyboard must have buttons")
-    return markup
-
-
-def build_cancel_keyboard(participation_id: str) -> InlineKeyboardMarkup:
-    spec = build_confirmed_reminder_prompt(participation_id)
-    markup = message_markup(spec)
-    if markup is None:
-        raise ValueError("Cancel keyboard must have buttons")
-    return markup
-
-
-def build_keep_booking_prompt(participation_id: str, text: str) -> MessageSpec:
-    return MessageSpec(
-        text=text,
-        buttons=(
-            (
-                ButtonSpec(label="Accept", callback_data=f"accept:{participation_id}"),
-                ButtonSpec(label="Reject", callback_data=f"reject:{participation_id}"),
-            ),
-        ),
-    )
-
-
-def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
-    return MessageSpec(
-        text="Reminder: your class is coming up soon. If you changed your mind, cancel now.",
-        buttons=((ButtonSpec(label="Cancel now", callback_data=f"cancel:{participation_id}"),),),
-    )
 
 
 def is_cycle_active(session) -> bool:
@@ -387,6 +336,9 @@ async def handle_slot_booking_actions(
         )
         add_booking_choice(session, choice)
         session.commit()
+        if choice.id is None:
+            raise ValueError("Booking choice ID must be set after commit")
+        choice_id = choice.id
 
         lines = ["Multiple classes match this time slot. Pick one to book:"]
         for idx, option in enumerate(options, start=1):
@@ -396,9 +348,10 @@ async def handle_slot_booking_actions(
 
         buttons: tuple[tuple[ButtonSpec, ...], ...] = tuple(
             (
-                ButtonSpec(
+                build_choice_pick_button(
+                    choice_id=choice_id,
+                    option_index=idx,
                     label=f"{idx + 1}. {option['startTime']} {option['title']}",
-                    callback_data=f"pick:{choice.id}:{idx}",
                 ),
             )
             for idx, option in enumerate(options)
