@@ -15,7 +15,8 @@ Single-user Telegram bot for automatically booking PureGym classes that match a 
 - `/start` enables automatic booking-cycle runs
 - `/stop` disables automatic booking-cycle runs
 - `/status` shows whether automatic booking is currently enabled
-- `/booked_classes` shows your upcoming booked classes
+- `/booked` shows your upcoming booked classes
+- `/manage_bookings` shows upcoming bookings you can accept, reject, or cancel
 - `/class_ids` lists available class types so you can update the config
 - `/center_ids` lists available centers so you can update the config
 - `/run_now` queues an immediate booking-cycle run
