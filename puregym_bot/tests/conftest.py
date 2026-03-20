@@ -7,7 +7,6 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from puregym_bot.bot import app, booking_cycle, dependencies, handlers
 from puregym_bot.config import Config, GymClassPreferences, TimeSlot, Weekday, clear_config_cache
-from puregym_bot.puregym import client as puregym_client
 from puregym_bot.storage.models import BotState
 
 
@@ -35,7 +34,6 @@ def configured_jobs(monkeypatch, session_factory, test_config):
     monkeypatch.setattr(booking_cycle, "get_config", lambda: test_config)
     monkeypatch.setattr(dependencies, "get_config", lambda: test_config)
     monkeypatch.setattr(handlers, "get_config", lambda: test_config)
-    monkeypatch.setattr(puregym_client, "get_config", lambda: test_config)
 
 
 @pytest.fixture

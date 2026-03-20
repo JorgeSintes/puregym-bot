@@ -21,10 +21,10 @@ from puregym_bot.bot.prompts import (
     message_markup,
 )
 from puregym_bot.config import get_config
-from puregym_bot.formatting import format_telegram_class_time
-from puregym_bot.puregym.client import PureGymClient
-from puregym_bot.puregym.filters import filter_by_booked
-from puregym_bot.puregym.schemas import GymClass
+from puregym_bot.formatting import format_telegram_class_time, format_telegram_gym_class
+from puregym_mcp.puregym.client import PureGymClient
+from puregym_mcp.puregym.filters import filter_by_booked
+from puregym_mcp.puregym.schemas import GymClass
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
 from puregym_bot.storage.repository import (
@@ -391,18 +391,21 @@ def build_manage_booking_prompt(actionable_booking: ActionableBooking):
     if actionable_booking.managed_booking is None:
         return build_cancel_booking_prompt(
             participation_id,
-            text=f"External booking:\n{gym_class.format()}\nCancel it if you no longer want it.",
+            text=f"External booking:\n{format_telegram_gym_class(gym_class)}\nCancel it if you no longer want it.",
         )
 
     if actionable_booking.managed_booking.status == BookingStatus.PENDING:
         return build_keep_booking_prompt(
             participation_id,
-            text=f"Pending booking:\n{gym_class.format()}\nAccept to keep it or reject to cancel it.",
+            text=(
+                f"Pending booking:\n{format_telegram_gym_class(gym_class)}\n"
+                "Accept to keep it or reject to cancel it."
+            ),
         )
 
     return build_cancel_booking_prompt(
         participation_id,
-        text=f"Confirmed booking:\n{gym_class.format()}\nCancel it if you no longer want it.",
+        text=f"Confirmed booking:\n{format_telegram_gym_class(gym_class)}\nCancel it if you no longer want it.",
     )
 
 

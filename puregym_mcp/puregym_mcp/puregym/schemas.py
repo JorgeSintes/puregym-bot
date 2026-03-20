@@ -1,9 +1,6 @@
 import re
-from datetime import datetime, timedelta, time
 
-from pydantic import BaseModel
-
-from puregym_bot.formatting import format_telegram_class_summary, format_telegram_datetime
+from pydantic import BaseModel, computed_field
 
 WAITLIST_POSITION_PATTERN = re.compile(r"nr\.\s*(\d+)\s+pa\s+ventelisten", re.IGNORECASE)
 WAITLIST_SIZE_PATTERN = re.compile(r"Venteliste\s*\((\d+)\)", re.IGNORECASE)
@@ -66,6 +63,7 @@ class GymClass(BaseModel):
     level: dict
     button: dict
 
+    @computed_field
     @property
     def button_description(self) -> str | None:
         description = self.button.get("description")
@@ -73,6 +71,7 @@ class GymClass(BaseModel):
             return description
         return None
 
+    @computed_field
     @property
     def waitlist_position(self) -> int | None:
         description = self.button_description
@@ -85,6 +84,7 @@ class GymClass(BaseModel):
             return None
         return int(match.group(1))
 
+    @computed_field
     @property
     def waitlist_size(self) -> int | None:
         description = self.button_description
@@ -96,19 +96,12 @@ class GymClass(BaseModel):
             return None
         return int(match.group(1))
 
+    @computed_field
     @property
     def is_waitlisted(self) -> bool:
         return self.waitlist_position is not None or self.waitlist_size is not None
 
-    def format(self) -> str:
-        class_date = datetime.fromisoformat(self.date).date()
-        start_time = time.fromisoformat(self.startTime)
-        class_dt = datetime.combine(class_date, start_time)
-        cancel_deadline = class_dt - timedelta(hours=3)
-        message = (
-            f"{format_telegram_class_summary(self.date, self.startTime, self.title, self.location)} "
-            f"| cancel by {format_telegram_datetime(cancel_deadline)}"
-        )
-        if self.waitlist_position is not None:
-            return f"{message} | waitlist #{self.waitlist_position}"
-        return message
+    @computed_field
+    @property
+    def is_booked(self) -> bool:
+        return self.participationId is not None

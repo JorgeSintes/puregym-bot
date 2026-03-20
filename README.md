@@ -1,30 +1,89 @@
-# PureGym Bot
+# PureGym Workspace
 
-Single-user Telegram bot for automatically booking PureGym classes that match a configured schedule.
+This repository contains two related projects:
 
-## What it does
+- `puregym_mcp/`: a publishable PureGym client library and MCP server
+- `puregym_bot/`: a private single-user Telegram bot built on top of `puregym-mcp`
 
-- Runs the booking cycle automatically while auto-booking is enabled
-- Sends Telegram prompts so you can accept or reject pending bookings
-- Sends reminders before class time
-- Cancels stale pending bookings before they get too close to class time
-- Keeps track of booking state locally so it does not repeatedly prompt for the same slot
+## What Each Project Does
 
-## Commands
+### `puregym_mcp`
 
-- `/start` enables automatic booking-cycle runs
-- `/stop` disables automatic booking-cycle runs
-- `/status` shows whether automatic booking is currently enabled
-- `/booked` shows your upcoming booked classes
-- `/manage_bookings` shows upcoming bookings you can accept, reject, or cancel
-- `/class_ids` lists available class types so you can update the config
-- `/center_ids` lists available centers so you can update the config
-- `/run_now` queues an immediate booking-cycle run
+- Exposes structured PureGym data for LLM tooling through MCP
+- Supports anonymous read-only mode for public/hosted use
+- Supports authenticated self-hosted mode through `PUREGYM_USERNAME` and `PUREGYM_PASSWORD`
+- Returns structured fields plus derived values like `is_booked`, `is_waitlisted`, `waitlist_position`, and `waitlist_size`
 
-When automatic booking is disabled, the informational commands still work. `/run_now` also still works as a command, but the booking cycle will respect the disabled state and skip booking.
+Current MCP tool set:
+
+- always available:
+  - `get_capabilities`
+  - `list_class_types`
+  - `list_centers`
+  - `search_classes`
+- authenticated only:
+  - `list_my_bookings`
+  - `book_class`
+  - `cancel_booking`
+
+### `puregym_bot`
+
+- Polls PureGym for matching classes based on configured preferences and time slots
+- Prebooks matching classes for one Telegram user
+- Tracks managed booking state locally in SQLite
+- Asks the user to accept, reject, or cancel bookings through Telegram
+- Shows waitlist state and unmanaged bookings alongside bot-managed ones
+
+## Repository Structure
+
+```text
+repo/
+  puregym_mcp/
+    pyproject.toml
+    puregym_mcp/
+    tests/
+  puregym_bot/
+    pyproject.toml
+    puregym_bot/
+    config.yaml
+    config_template.yaml
+    tests/
+```
+
+## Install
+
+From the workspace root:
+
+```bash
+uv sync --all-packages --all-groups
+```
+
+## Common Commands
+
+Run the MCP server:
+
+```bash
+uv run --package puregym-mcp puregym-mcp
+```
+
+Run the Telegram bot:
+
+```bash
+uv run --package puregym-bot puregym-bot
+```
+
+Run tests:
+
+```bash
+uv run --package puregym-mcp pytest
+uv run --package puregym-bot pytest
+```
 
 ## Notes
 
-- The bot is configured for one Telegram user and one PureGym account
-- Class matching is based on configured class IDs, center IDs, and weekly time slots
-- The booking window currently looks ahead up to 28 days
+- Hosted authenticated MCP is intentionally out of scope
+- Self-hosted authenticated MCP uses local env vars, not credential-passing through tool calls
+- The Telegram bot is single-user by design
+- The bot imports PureGym client/domain code from `puregym_mcp`
+
+See `puregym_mcp/README.md` for MCP usage/config examples and `puregym_bot/README.md` for bot setup details.

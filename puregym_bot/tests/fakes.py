@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, time
 
-from puregym_bot.puregym.schemas import GymClass
+from puregym_mcp.puregym.schemas import GymClass
 
 
 def make_gym_class(

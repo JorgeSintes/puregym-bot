@@ -1,3 +1,4 @@
+from pathlib import Path
 from datetime import time
 from enum import IntEnum
 from functools import lru_cache
@@ -10,6 +11,10 @@ from pydantic_settings import (
     SettingsConfigDict,
     YamlConfigSettingsSource,
 )
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = PROJECT_ROOT / "config.yaml"
 
 
 def valid_str(value: str) -> str:
@@ -85,7 +90,7 @@ class Config(BaseSettings):
     pending_auto_cancel_hours: int = 3
     booking_interval_seconds: int = 60
 
-    model_config = SettingsConfigDict(yaml_file="config.yaml", yaml_file_encoding="utf-8")
+    model_config = SettingsConfigDict(yaml_file=str(CONFIG_PATH), yaml_file_encoding="utf-8")
 
     @classmethod
     def settings_customise_sources(

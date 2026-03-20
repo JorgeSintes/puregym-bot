@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from puregym_bot.config import get_config
-from puregym_bot.puregym.client import PureGymClient
+from puregym_mcp.puregym.client import PureGymClient
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.repository import get_bot_state
 

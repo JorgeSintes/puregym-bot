@@ -6,7 +6,7 @@ from sqlmodel import Session, select
 
 from puregym_bot.bot import booking_cycle
 from puregym_bot.bot.callback_data import BookingCallback, BookingCallbackAction
-from puregym_bot.puregym.client import PureGymClient
+from puregym_mcp.puregym.client import PureGymClient
 from puregym_bot.storage.models import BookingChoice, BookingStatus, BotState, ManagedBooking
 from tests.fakes import FakePureGymClient, make_gym_class
 

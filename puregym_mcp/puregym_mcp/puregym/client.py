@@ -5,15 +5,14 @@ from datetime import datetime, timedelta
 import httpx
 from bs4 import BeautifulSoup
 
-from puregym_bot.config import get_config
-from puregym_bot.puregym.schemas import CenterGroup, GymClass, GymClassTypesGroup
+from puregym_mcp.puregym.schemas import CenterGroup, GymClass, GymClassTypesGroup
 
 BASE_URL = "https://www.puregym.dk/"
 API_URL = "https://www.puregym.dk/api/"
 
 
 class PureGymClient:
-    def __init__(self, username: str, password: str):
+    def __init__(self, username: str | None = None, password: str | None = None):
         self.username = username
         self.password = password
         self.client = httpx.AsyncClient(follow_redirects=True)
@@ -22,6 +21,9 @@ class PureGymClient:
         self._auth_check_ttl_seconds = 300
 
     async def login(self) -> None:
+        if not self.has_credentials:
+            raise ValueError("PureGym credentials are required for authenticated operations")
+
         r = await self.client.get(BASE_URL)
         soup = BeautifulSoup(r.text, "html.parser")
 
@@ -57,6 +59,8 @@ class PureGymClient:
         return data.get("search_days_allowed") == 28
 
     async def _ensure_authenticated(self) -> None:
+        if not self.has_credentials:
+            raise ValueError("PureGym credentials are required for authenticated operations")
         if self._auth_checked_at is not None:
             if time.monotonic() - self._auth_checked_at < self._auth_check_ttl_seconds:
                 return
@@ -65,6 +69,14 @@ class PureGymClient:
             return
         async with self._login_lock:
             await self.login()
+
+    @property
+    def has_credentials(self) -> bool:
+        return bool(self.username and self.password)
+
+    @property
+    def search_days_allowed(self) -> int:
+        return 28 if self.has_credentials else 14
 
     async def _request_json(self, method: str, url: str, require_auth: bool = True, **kwargs):
         if require_auth:
@@ -87,23 +99,23 @@ class PureGymClient:
 
     async def get_available_classes(
         self,
-        class_ids: list[int],
-        center_ids: list[int],
+        class_ids: list[int] | None = None,
+        center_ids: list[int] | None = None,
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> list[GymClass]:
         if from_date is None:
             from_date = datetime.today().strftime("%Y-%m-%d")
         if to_date is None:
-            config = get_config()
-            to_date = (datetime.today() + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d")
+            to_date = (datetime.today() + timedelta(days=self.search_days_allowed)).strftime("%Y-%m-%d")
 
         data = await self._request_json(
             "GET",
             f"{API_URL}search_activities",
+            require_auth=self.has_credentials,
             params={
-                "classes[]": class_ids,
-                "centers[]": center_ids,
+                "classes[]": class_ids or [],
+                "centers[]": center_ids or [],
                 "from": from_date,
                 "to": to_date,
             },
