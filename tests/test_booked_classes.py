@@ -5,10 +5,11 @@ from typing import cast
 import pytest
 from sqlmodel import Session
 from telegram import Update
+from telegram import InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.dependencies import HandlerContext
-from puregym_bot.bot.handlers import booked_classes
+from puregym_bot.bot.handlers import booked_classes, manage_bookings
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.storage.models import BookingStatus, ManagedBooking
 from tests.fakes import FakeContext, FakePureGymClient, make_gym_class
@@ -196,7 +197,7 @@ async def test_booked_classes_hides_stale_managed_bookings(configured_jobs, test
     assert context.bot.calls[0]["text"] == (
         "Your upcoming bookings:\n"
         "- Mon 23/03 09:00  Bike Standard @ PureGym Aarhusgade - pending\n"
-        "- Mon 23/03 12:00  Yoga Flow @ PureGym Aarhusgade - unmanaged, waitlist #7"
+        "- Mon 23/03 12:00  Yoga Flow @ PureGym Aarhusgade - external, waitlist #7"
     )
 
 
@@ -266,3 +267,110 @@ async def test_booked_classes_splits_long_output_into_multiple_messages(configur
     assert len(context.bot.calls) > 1
     assert context.bot.calls[0]["text"].startswith("Your upcoming bookings:\n")
     assert all(len(call["text"]) <= 4000 for call in context.bot.calls)
+
+
+def keyboard_labels(call: dict) -> list[list[str]]:
+    markup = cast(InlineKeyboardMarkup, call["reply_markup"])
+    return [[button.text for button in row] for row in markup.inline_keyboard]
+
+
+@pytest.mark.asyncio
+async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_external(
+    configured_jobs, test_engine
+):
+    live_classes = [
+        make_gym_class(
+            booking_id="b-pending",
+            activity_id=1,
+            day=datetime(2026, 3, 23).date(),
+            start=time(9, 0),
+            end=time(9, 55),
+            participation_id="pid-pending",
+            title="Bike Standard",
+            location="PureGym Aarhusgade",
+        ),
+        make_gym_class(
+            booking_id="b-confirmed",
+            activity_id=2,
+            day=datetime(2026, 3, 23).date(),
+            start=time(12, 0),
+            end=time(12, 55),
+            participation_id="pid-confirmed",
+            title="Yoga Flow",
+            location="PureGym Aarhusgade",
+        ),
+        make_gym_class(
+            booking_id="b-external",
+            activity_id=3,
+            day=datetime(2026, 3, 23).date(),
+            start=time(16, 30),
+            end=time(17, 25),
+            participation_id="pid-external",
+            title="Pilates",
+            location="PureGym Aarhusgade",
+        ),
+    ]
+    client = FakePureGymClient(live_classes)
+    context = FakeContext(client)
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        session.add(
+            ManagedBooking(
+                booking_id="b-pending",
+                activity_id=1,
+                payment_type="membership",
+                participation_id="pid-pending",
+                class_datetime=datetime(2026, 3, 23, 9, 0),
+                status=BookingStatus.PENDING,
+            )
+        )
+        session.add(
+            ManagedBooking(
+                booking_id="b-confirmed",
+                activity_id=2,
+                payment_type="membership",
+                participation_id="pid-confirmed",
+                class_datetime=datetime(2026, 3, 23, 12, 0),
+                status=BookingStatus.CONFIRMED,
+            )
+        )
+        session.commit()
+
+        handler_ctx = HandlerContext(session=session, client=cast(PureGymClient, client), bot_active=True)
+        await manage_bookings(make_update(), cast(ContextTypes.DEFAULT_TYPE, context), handler_ctx)
+
+    assert [call["text"] for call in context.bot.calls] == [
+        "1 pending booking to review, 2 bookings you can cancel.",
+        (
+            "Pending booking:\n"
+            "Mon 23/03 09:00  Bike Standard @ PureGym Aarhusgade | cancel by Mon 23/03 06:00\n"
+            "Accept to keep it or reject to cancel it."
+        ),
+        (
+            "Confirmed booking:\n"
+            "Mon 23/03 12:00  Yoga Flow @ PureGym Aarhusgade | cancel by Mon 23/03 09:00\n"
+            "Cancel it if you no longer want it."
+        ),
+        (
+            "External booking:\n"
+            "Mon 23/03 16:30  Pilates @ PureGym Aarhusgade | cancel by Mon 23/03 13:30\n"
+            "Cancel it if you no longer want it."
+        ),
+    ]
+    assert context.bot.calls[0]["reply_markup"] is None
+    assert keyboard_labels(context.bot.calls[1]) == [["Accept", "Reject"]]
+    assert keyboard_labels(context.bot.calls[2]) == [["Cancel"]]
+    assert keyboard_labels(context.bot.calls[3]) == [["Cancel"]]
+
+
+@pytest.mark.asyncio
+async def test_manage_bookings_returns_empty_state_when_nothing_is_actionable(configured_jobs, test_engine):
+    client = FakePureGymClient([])
+    context = FakeContext(client)
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        handler_ctx = HandlerContext(session=session, client=cast(PureGymClient, client), bot_active=True)
+        await manage_bookings(make_update(), cast(ContextTypes.DEFAULT_TYPE, context), handler_ctx)
+
+    assert len(context.bot.calls) == 1
+    assert context.bot.calls[0]["text"] == "Nothing to manage right now."

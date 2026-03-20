@@ -53,13 +53,13 @@ def build_keep_booking_prompt(participation_id: str, text: str) -> MessageSpec:
     )
 
 
-def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
+def build_cancel_booking_prompt(participation_id: str, text: str) -> MessageSpec:
     return MessageSpec(
-        text="Reminder: your class is coming up soon. If you changed your mind, cancel now.",
+        text=text,
         buttons=(
             (
                 ButtonSpec(
-                    label="Cancel now",
+                    label="Cancel",
                     callback_data=BookingCallback(
                         action=BookingCallbackAction.CANCEL,
                         participation_id=participation_id,
@@ -67,6 +67,17 @@ def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
                 ),
             ),
         ),
+    )
+
+
+def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
+    prompt = build_cancel_booking_prompt(
+        participation_id,
+        text="Reminder: your class is coming up soon. If you changed your mind, cancel now.",
+    )
+    return MessageSpec(
+        text=prompt.text,
+        buttons=((ButtonSpec(label="Cancel now", callback_data=prompt.buttons[0][0].callback_data),),),
     )
 
 
