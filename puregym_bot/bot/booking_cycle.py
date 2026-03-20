@@ -13,7 +13,7 @@ from puregym_bot.bot.prompts import (
     build_keep_booking_prompt,
     message_markup,
 )
-from puregym_bot.config import TimeSlot, config
+from puregym_bot.config import TimeSlot, get_config
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked, filter_by_time_slots
 from puregym_bot.puregym.schemas import GymClass
@@ -97,6 +97,7 @@ def is_cycle_active(session) -> bool:
 
 
 async def fetch_candidate_classes(client: PureGymClient, now: datetime) -> list[GymClass]:
+    config = get_config()
     from_date = now.strftime("%Y-%m-%d")
     to_date = (now + timedelta(days=config.max_days_in_advance)).strftime("%Y-%m-%d")
     classes = await client.get_available_classes(
@@ -257,6 +258,7 @@ async def handle_slot_booking_actions(
     grouped_by_slot: dict[SlotOccurrence, list[GymClass]],
     active_count: int,
 ) -> StepResult:
+    config = get_config()
     result = StepResult()
 
     for slot_occurrence in sorted(
@@ -444,6 +446,7 @@ async def auto_cancel_stale_pending_bookings(
 
 
 async def publish_prompts(context: ContextTypes.DEFAULT_TYPE, session, prompts: list[OutboundPrompt]) -> None:
+    config = get_config()
     for prompt in prompts:
         sent_message = await context.bot.send_message(
             chat_id=config.telegram_id,
@@ -461,6 +464,7 @@ async def publish_prompts(context: ContextTypes.DEFAULT_TYPE, session, prompts: 
 
 
 async def run_booking_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
+    config = get_config()
     now = datetime.now()
     client = context.bot_data.get("puregym_client")
     if client is None:

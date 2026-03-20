@@ -1,14 +1,17 @@
 from telegram import BotCommand
-from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler
+from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, filters
 
 from puregym_bot.bot import handlers
-from puregym_bot.bot.dependencies import AUTH_FILTER, build_handler, on_shutdown, on_startup
+from puregym_bot.bot.dependencies import build_handler, on_shutdown, on_startup
 from puregym_bot.bot.booking_cycle import run_booking_cycle
 from puregym_bot.bot.registry import COMMANDS
-from puregym_bot.config import config
+from puregym_bot.config import get_config
 
 
 def build_app():
+    config = get_config()
+    auth_filter = filters.User([config.telegram_id])
+
     async def post_init(app):
         await on_startup(app)
         await app.bot.set_my_commands([BotCommand(command.name, command.description) for command in COMMANDS])
@@ -27,7 +30,7 @@ def build_app():
             CommandHandler(
                 command.name,
                 build_handler(command.handler, allow_inactive=command.allow_inactive),
-                filters=AUTH_FILTER,
+                filters=auth_filter,
             )
         )
 

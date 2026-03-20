@@ -14,7 +14,7 @@ from puregym_bot.bot.callback_data import (
 )
 from puregym_bot.bot.dependencies import HandlerContext
 from puregym_bot.bot.prompts import build_selected_choice_confirmation_prompt, message_markup
-from puregym_bot.config import config
+from puregym_bot.config import get_config
 from puregym_bot.puregym.client import PureGymClient
 from puregym_bot.puregym.filters import filter_by_booked
 from puregym_bot.storage.db import get_db_session
@@ -39,6 +39,7 @@ async def start(
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
+    config = get_config()
     if update.effective_chat is None or update.effective_user is None:
         return
     set_bot_active(ctx.session, True)
@@ -58,6 +59,7 @@ async def stop(
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
+    config = get_config()
     if update.effective_chat is None:
         return
 
@@ -95,6 +97,7 @@ async def button(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE,
 ) -> None:
+    config = get_config()
     query = update.callback_query
     if query is None or update.effective_user is None:
         return
@@ -198,6 +201,7 @@ async def handle_choice_pick_callback(
     update: Update,
     callback: ChoicePickCallback,
 ) -> None:
+    config = get_config()
     query = update.callback_query
     if query is None:
         return
@@ -267,6 +271,7 @@ async def booked_classes(
     context: ContextTypes.DEFAULT_TYPE,
     ctx: HandlerContext,
 ):
+    config = get_config()
     if update.effective_chat is None:
         return
 

@@ -184,7 +184,7 @@ async def test_handle_slot_booking_actions_single_and_multiple(configured_jobs, 
     )
 
     grouped = booking_cycle.group_by_slot(
-        [single, option1, option2], booking_cycle.config.class_preferences.available_time_slots
+        [single, option1, option2], booking_cycle.get_config().class_preferences.available_time_slots
     )
     client = FakePureGymClient([])
 
@@ -225,7 +225,7 @@ async def test_handle_slot_booking_actions_skips_handled_slot(configured_jobs, t
         participation_id=None,
     )
     grouped = booking_cycle.group_by_slot(
-        [single], booking_cycle.config.class_preferences.available_time_slots
+        [single], booking_cycle.get_config().class_preferences.available_time_slots
     )
     client = FakePureGymClient([])
 
@@ -277,7 +277,7 @@ async def test_handle_slot_booking_actions_warns_and_skips_when_booked_class_has
         participation_id=None,
     )
     grouped = booking_cycle.group_by_slot(
-        [booked, available], booking_cycle.config.class_preferences.available_time_slots
+        [booked, available], booking_cycle.get_config().class_preferences.available_time_slots
     )
     client = FakePureGymClient([])
 
