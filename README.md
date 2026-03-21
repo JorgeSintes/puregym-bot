@@ -4,23 +4,31 @@ Single-user Telegram bot for PureGym automation.
 
 ## Setup
 
-- Copy `config_template.yaml` to `config.yaml` inside `puregym_bot/`
-- Fill in your Telegram and PureGym credentials
-- Install workspace dependencies from the repo root:
+- Clone `puregym-bot` and `puregym-mcp` as sibling directories, or update the local path source in `pyproject.toml`
+- Copy `config_template.yaml` to `config.yaml` at the repo root
+- Fill in your Telegram and PureGym credentials in `config.yaml`
+- Install dependencies:
 
 ```bash
-uv sync --all-packages --all-groups
+uv sync --dev
 ```
 
 ## Run
 
-From the workspace root:
+```bash
+uv run puregym-bot
+```
+
+## Test
 
 ```bash
-uv run --package puregym-bot puregym-bot
+uv run pytest
+uv run python -m compileall puregym_bot tests
 ```
 
 ## Files
 
 - `config.yaml`: bot runtime config
 - `config_template.yaml`: template config to copy and edit
+- `puregym_bot/`: bot package
+- `tests/`: bot test suite
