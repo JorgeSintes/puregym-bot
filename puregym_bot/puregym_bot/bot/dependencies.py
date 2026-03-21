@@ -24,6 +24,13 @@ async def on_startup(app):
         config.puregym_username,
         config.puregym_password.get_secret_value(),
     )
+    with get_db_session() as session:
+        bot_state = get_bot_state(session)
+    if bot_state.is_active:
+        await app.bot.send_message(
+            chat_id=config.telegram_id,
+            text="Hey! The bot is running the booking cycle. Use /stop to pause it.",
+        )
 
 
 async def on_shutdown(app):
