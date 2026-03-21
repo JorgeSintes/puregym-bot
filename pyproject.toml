@@ -1,2 +1,38 @@
-[tool.uv.workspace]
-members = ["puregym_mcp", "puregym_bot"]
+[build-system]
+requires = ["uv_build>=0.10.6,<0.11.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "puregym_bot"
+module-root = ""
+
+[project]
+name = "puregym-bot"
+version = "0.1.0"
+description = "Single-user Telegram bot for PureGym automation"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "puregym-mcp",
+    "pydantic-settings[yaml]>=2.13.1",
+    "python-telegram-bot[job-queue]>=22.6",
+    "sqlmodel>=0.0.37",
+]
+
+[project.scripts]
+puregym-bot = "puregym_bot.main:main"
+
+[tool.uv.sources]
+puregym-mcp = { path = "../puregym-mcp" }
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "ruff>=0.15.7",
+    "time-machine>=2.19.0",
+]
+
+[tool.ruff]
+line-length = 110

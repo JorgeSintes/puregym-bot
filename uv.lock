@@ -6,12 +6,6 @@ resolution-markers = [
     "python_full_version < '3.14'",
 ]
 
-[manifest]
-members = [
-    "puregym-bot",
-    "puregym-mcp",
-]
-
 [[package]]
 name = "annotated-types"
 version = "0.7.0"
@@ -632,7 +626,7 @@ wheels = [
 [[package]]
 name = "puregym-bot"
 version = "0.1.0"
-source = { editable = "puregym_bot" }
+source = { editable = "." }
 dependencies = [
     { name = "puregym-mcp" },
     { name = "pydantic-settings", extra = ["yaml"] },
@@ -651,7 +645,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "puregym-mcp", editable = "puregym_mcp" },
+    { name = "puregym-mcp", directory = "../puregym-mcp" },
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.13.1" },
     { name = "python-telegram-bot", extras = ["job-queue"], specifier = ">=22.6" },
     { name = "sqlmodel", specifier = ">=0.0.37" },
@@ -669,19 +663,12 @@ dev = [
 [[package]]
 name = "puregym-mcp"
 version = "0.1.0"
-source = { editable = "puregym_mcp" }
+source = { directory = "../puregym-mcp" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "httpx" },
     { name = "mcp" },
     { name = "pydantic" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "ruff" },
 ]
 
 [package.metadata]
