@@ -1,89 +1,35 @@
-# PureGym Workspace
+# PureGym Bot
 
-This repository contains two related projects:
+Single-user Telegram bot for PureGym automation.
 
-- `puregym_mcp/`: a publishable PureGym client library and MCP server
-- `puregym_bot/`: a private single-user Telegram bot built on top of `puregym-mcp`
+## Setup
 
-## What Each Project Does
-
-### `puregym_mcp`
-
-- Exposes structured PureGym data for LLM tooling through MCP
-- Supports anonymous read-only mode for public/hosted use
-- Supports authenticated self-hosted mode through `PUREGYM_USERNAME` and `PUREGYM_PASSWORD`
-- Returns structured fields plus derived values like `is_booked`, `is_waitlisted`, `waitlist_position`, and `waitlist_size`
-
-Current MCP tool set:
-
-- always available:
-  - `get_capabilities`
-  - `list_class_types`
-  - `list_centers`
-  - `search_classes`
-- authenticated only:
-  - `list_my_bookings`
-  - `book_class`
-  - `cancel_booking`
-
-### `puregym_bot`
-
-- Polls PureGym for matching classes based on configured preferences and time slots
-- Prebooks matching classes for one Telegram user
-- Tracks managed booking state locally in SQLite
-- Asks the user to accept, reject, or cancel bookings through Telegram
-- Shows waitlist state and unmanaged bookings alongside bot-managed ones
-
-## Repository Structure
-
-```text
-repo/
-  puregym_mcp/
-    pyproject.toml
-    puregym_mcp/
-    tests/
-  puregym_bot/
-    pyproject.toml
-    puregym_bot/
-    config.yaml
-    config_template.yaml
-    tests/
-```
-
-## Install
-
-From the workspace root:
+- Copy `config_template.yaml` to `config.yaml` at the repo root
+- Fill in your Telegram and PureGym credentials in `config.yaml`
+- Install dependencies:
 
 ```bash
-uv sync --all-packages --all-groups
+uv sync --dev
 ```
 
-## Common Commands
+By default, `puregym-mcp` is resolved from the GitHub `main` branch. If you are co-developing both repos locally, you can temporarily override that with a local editable install of your sibling `puregym-mcp` checkout.
 
-Run the MCP server:
+## Run
 
 ```bash
-uv run --package puregym-mcp puregym-mcp
+uv run puregym-bot
 ```
 
-Run the Telegram bot:
+## Test
 
 ```bash
-uv run --package puregym-bot puregym-bot
+uv run pytest
+uv run python -m compileall puregym_bot tests
 ```
 
-Run tests:
+## Files
 
-```bash
-uv run --package puregym-mcp pytest
-uv run --package puregym-bot pytest
-```
-
-## Notes
-
-- Hosted authenticated MCP is intentionally out of scope
-- Self-hosted authenticated MCP uses local env vars, not credential-passing through tool calls
-- The Telegram bot is single-user by design
-- The bot imports PureGym client/domain code from `puregym_mcp`
-
-See `puregym_mcp/README.md` for MCP usage/config examples and `puregym_bot/README.md` for bot setup details.
+- `config.yaml`: bot runtime config
+- `config_template.yaml`: template config to copy and edit
+- `puregym_bot/`: bot package
+- `tests/`: bot test suite
