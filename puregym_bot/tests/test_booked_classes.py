@@ -10,7 +10,8 @@ from telegram.ext import ContextTypes
 
 from puregym_bot.bot.dependencies import HandlerContext
 from puregym_bot.bot.handlers import booked_classes, manage_bookings
-from puregym_bot.puregym.client import PureGymClient
+from puregym_bot.formatting import format_telegram_booking
+from puregym_mcp.puregym.client import PureGymClient
 from puregym_bot.storage.models import BookingStatus, ManagedBooking
 from tests.fakes import FakeContext, FakePureGymClient, make_gym_class
 
@@ -74,7 +75,7 @@ def test_gym_class_waitlist_helpers_ignore_missing_description():
     assert gym_class.is_waitlisted is False
 
 
-def test_gym_class_format_uses_telegram_date_time_format():
+def test_format_telegram_booking_uses_telegram_date_time_format():
     gym_class = make_gym_class(
         booking_id="b-4",
         activity_id=4,
@@ -84,7 +85,10 @@ def test_gym_class_format_uses_telegram_date_time_format():
         participation_id="pid-4",
     )
 
-    assert gym_class.format() == "Mon 23/03 09:00  Body Pump @ Main Hall | cancel by Mon 23/03 06:00"
+    assert (
+        format_telegram_booking(gym_class)
+        == "Mon 23/03 09:00  Body Pump @ Main Hall | cancel by Mon 23/03 06:00"
+    )
 
 
 @pytest.mark.asyncio

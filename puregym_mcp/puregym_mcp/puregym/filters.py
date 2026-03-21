@@ -1,14 +1,20 @@
 from datetime import datetime, time
+from typing import Protocol
 
-from puregym_bot.config import TimeSlot
-from puregym_bot.puregym.schemas import GymClass
+from puregym_mcp.puregym.schemas import GymClass
+
+
+class TimeSlotLike(Protocol):
+    day_of_week: int
+    start_time: time
+    end_time: time
 
 
 def filter_by_booked(classes: list[GymClass], booked: bool = True) -> list[GymClass]:
     return [c for c in classes if (c.participationId is not None) == booked]
 
 
-def filter_by_time_slot(classes: list[GymClass], time_slot: TimeSlot) -> list[GymClass]:
+def filter_by_time_slot(classes: list[GymClass], time_slot: TimeSlotLike) -> list[GymClass]:
     filtered_classes = []
     for c in classes:
         date = datetime.fromisoformat(c.date)
@@ -22,10 +28,7 @@ def filter_by_time_slot(classes: list[GymClass], time_slot: TimeSlot) -> list[Gy
     return filtered_classes
 
 
-def filter_by_time_slots(
-    classes: list[GymClass], time_slots: list[TimeSlot]
-) -> list[GymClass]:
-
+def filter_by_time_slots(classes: list[GymClass], time_slots: list[TimeSlotLike]) -> list[GymClass]:
     filtered_classes = []
 
     for time_slot in time_slots:

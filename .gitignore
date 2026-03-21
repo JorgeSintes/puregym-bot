@@ -11,3 +11,4 @@ wheels/
 config.yaml
 debug.py
 puregym_bot.db
+opencode.jsonc

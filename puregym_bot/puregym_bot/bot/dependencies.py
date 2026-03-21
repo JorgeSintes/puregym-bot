@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from puregym_bot.config import get_config
-from puregym_bot.puregym.client import PureGymClient
+from puregym_mcp.puregym.client import PureGymClient
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.repository import get_bot_state
 
@@ -24,6 +24,13 @@ async def on_startup(app):
         config.puregym_username,
         config.puregym_password.get_secret_value(),
     )
+    with get_db_session() as session:
+        bot_state = get_bot_state(session)
+    if bot_state.is_active:
+        await app.bot.send_message(
+            chat_id=config.telegram_id,
+            text="Hey! The bot is running the booking cycle. Use /stop to pause it.",
+        )
 
 
 async def on_shutdown(app):

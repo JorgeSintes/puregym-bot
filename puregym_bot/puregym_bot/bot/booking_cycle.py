@@ -16,11 +16,12 @@ from puregym_bot.bot.prompts import (
 from puregym_bot.config import TimeSlot, get_config
 from puregym_bot.formatting import (
     format_telegram_class_summary,
+    format_telegram_booking,
     format_telegram_time,
 )
-from puregym_bot.puregym.client import PureGymClient
-from puregym_bot.puregym.filters import filter_by_booked, filter_by_time_slots
-from puregym_bot.puregym.schemas import GymClass
+from puregym_mcp.puregym.client import PureGymClient
+from puregym_mcp.puregym.filters import filter_by_booked, filter_by_time_slots
+from puregym_mcp.puregym.schemas import GymClass
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingChoice, BookingStatus, ManagedBooking
 from puregym_bot.storage.repository import (
@@ -314,7 +315,7 @@ async def handle_slot_booking_actions(
 
             message = build_keep_booking_prompt(
                 participation_id,
-                text=f"Booked: {gym_class.format()}\nDo you want to keep it?",
+                text=f"Booked: {format_telegram_booking(gym_class)}\nDo you want to keep it?",
             )
             result.prompts.append(OutboundPrompt(booking=booking, message=message))
             continue
