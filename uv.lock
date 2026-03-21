@@ -645,7 +645,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "puregym-mcp", directory = "../puregym-mcp" },
+    { name = "puregym-mcp", git = "https://github.com/JorgeSintes/puregym-mcp?branch=main" },
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.13.1" },
     { name = "python-telegram-bot", extras = ["job-queue"], specifier = ">=22.6" },
     { name = "sqlmodel", specifier = ">=0.0.37" },
@@ -663,27 +663,12 @@ dev = [
 [[package]]
 name = "puregym-mcp"
 version = "0.1.0"
-source = { directory = "../puregym-mcp" }
+source = { git = "https://github.com/JorgeSintes/puregym-mcp?branch=main#f610772a01f62b4ae1f26cbf7c06d98cac7e4266" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "httpx" },
     { name = "mcp" },
     { name = "pydantic" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beautifulsoup4", specifier = ">=4.14.3" },
-    { name = "httpx", specifier = ">=0.28.1" },
-    { name = "mcp", specifier = ">=1.0.0" },
-    { name = "pydantic", specifier = ">=2.12.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-asyncio", specifier = ">=1.2.0" },
-    { name = "ruff", specifier = ">=0.15.7" },
 ]
 
 [[package]]

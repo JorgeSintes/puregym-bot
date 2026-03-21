@@ -4,7 +4,6 @@ Single-user Telegram bot for PureGym automation.
 
 ## Setup
 
-- Clone `puregym-bot` and `puregym-mcp` as sibling directories, or update the local path source in `pyproject.toml`
 - Copy `config_template.yaml` to `config.yaml` at the repo root
 - Fill in your Telegram and PureGym credentials in `config.yaml`
 - Install dependencies:
@@ -12,6 +11,8 @@ Single-user Telegram bot for PureGym automation.
 ```bash
 uv sync --dev
 ```
+
+By default, `puregym-mcp` is resolved from the GitHub `main` branch. If you are co-developing both repos locally, you can temporarily override that with a local editable install of your sibling `puregym-mcp` checkout.
 
 ## Run
 

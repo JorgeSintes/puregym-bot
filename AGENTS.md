@@ -4,7 +4,8 @@
 
 - This repo contains only the single-user Telegram bot.
 - The bot depends on the separate `puregym-mcp` repo as a package dependency.
-- In local development, `pyproject.toml` currently points `puregym-mcp` at `../puregym-mcp`.
+- By default, `pyproject.toml` resolves `puregym-mcp` from GitHub.
+- Local sibling checkouts of `puregym-mcp` are optional and may be used as temporary development overrides.
 - The bot remains single-user.
 - The configured owner is the only Telegram user allowed to interact with the bot.
 - The bot polls PureGym for matching classes, tracks booking state locally, and asks the user to confirm or reject bookings through Telegram.

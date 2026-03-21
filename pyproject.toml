@@ -23,7 +23,7 @@ dependencies = [
 puregym-bot = "puregym_bot.main:main"
 
 [tool.uv.sources]
-puregym-mcp = { path = "../puregym-mcp" }
+puregym-mcp = { git = "https://github.com/JorgeSintes/puregym-mcp", branch = "main" }
 
 [dependency-groups]
 dev = [
