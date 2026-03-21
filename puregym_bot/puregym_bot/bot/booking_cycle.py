@@ -16,7 +16,7 @@ from puregym_bot.bot.prompts import (
 from puregym_bot.config import TimeSlot, get_config
 from puregym_bot.formatting import (
     format_telegram_class_summary,
-    format_telegram_gym_class,
+    format_telegram_booking,
     format_telegram_time,
 )
 from puregym_mcp.puregym.client import PureGymClient
@@ -315,7 +315,7 @@ async def handle_slot_booking_actions(
 
             message = build_keep_booking_prompt(
                 participation_id,
-                text=f"Booked: {format_telegram_gym_class(gym_class)}\nDo you want to keep it?",
+                text=f"Booked: {format_telegram_booking(gym_class)}\nDo you want to keep it?",
             )
             result.prompts.append(OutboundPrompt(booking=booking, message=message))
             continue

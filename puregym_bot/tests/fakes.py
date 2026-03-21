@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, time
 
-from puregym_mcp.puregym.schemas import GymClass
+from puregym_mcp.puregym.schemas import DashboardBooking, GymClass
 
 
 def make_gym_class(
@@ -40,6 +40,27 @@ def make_gym_class(
     )
 
 
+def make_dashboard_booking(
+    *,
+    day: date,
+    start: time,
+    participation_id: str,
+    title: str = "Body Pump",
+    location: str = "Main Hall",
+    center_name: str = "Center 1",
+    button_description: str | None = None,
+) -> DashboardBooking:
+    return DashboardBooking(
+        date=day.isoformat(),
+        startTime=start.isoformat(),
+        title=title,
+        location=location,
+        centerName=center_name,
+        participationId=participation_id,
+        button_description=button_description,
+    )
+
+
 @dataclass
 class FakeSentMessage:
     message_id: int
@@ -70,14 +91,18 @@ class FakeContext:
 
 
 class FakePureGymClient:
-    def __init__(self, classes):
+    def __init__(self, classes, bookings=None):
         self.classes = classes
+        self.bookings = bookings if bookings is not None else classes
         self.book_calls: list[str] = []
         self.book_by_ids_calls: list[tuple[str, int, str]] = []
         self.unbook_calls: list[str] = []
 
     async def get_available_classes(self, **_kwargs):
         return self.classes
+
+    async def get_my_bookings(self):
+        return self.bookings
 
     async def book_class(self, gym_class: GymClass):
         self.book_calls.append(gym_class.bookingId)
