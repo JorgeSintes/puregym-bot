@@ -5,7 +5,8 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from puregym_bot.storage.models import BotState
 
-DATABASE_PATH = Path("puregym_bot.db")
+DATABASE_DIR = Path("data")
+DATABASE_PATH = DATABASE_DIR / "puregym_bot.db"
 DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
 
 engine = create_engine(
@@ -15,7 +16,12 @@ engine = create_engine(
 )
 
 
+def ensure_database_dir() -> None:
+    DATABASE_DIR.mkdir(parents=True, exist_ok=True)
+
+
 def init_db() -> None:
+    ensure_database_dir()
     # Create DB file + tables if not exists
     SQLModel.metadata.create_all(engine)
 
@@ -27,6 +33,7 @@ def init_db() -> None:
 
 @contextmanager
 def get_db_session():
+    ensure_database_dir()
     with Session(engine, expire_on_commit=False) as session:
         yield session
 
