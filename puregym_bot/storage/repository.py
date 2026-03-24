@@ -1,7 +1,6 @@
-from datetime import datetime, time
-
 from sqlmodel import Session, col, select
 
+from puregym_bot.datetime_utils import combine_copenhagen
 from puregym_bot.storage.models import (
     BookingChoice,
     BookingStatus,
@@ -58,8 +57,8 @@ def get_handled_bookings_for_slot(
     slot_start: str,
     slot_end: str,
 ) -> list[ManagedBooking]:
-    slot_start_dt = datetime.combine(datetime.fromisoformat(slot_date).date(), time.fromisoformat(slot_start))
-    slot_end_dt = datetime.combine(datetime.fromisoformat(slot_date).date(), time.fromisoformat(slot_end))
+    slot_start_dt = combine_copenhagen(slot_date, slot_start)
+    slot_end_dt = combine_copenhagen(slot_date, slot_end)
     statement = select(ManagedBooking).where(
         ManagedBooking.class_datetime >= slot_start_dt,
         ManagedBooking.class_datetime < slot_end_dt,

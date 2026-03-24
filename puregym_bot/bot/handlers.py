@@ -1,7 +1,7 @@
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -21,6 +21,7 @@ from puregym_bot.bot.prompts import (
     message_markup,
 )
 from puregym_bot.config import get_config
+from puregym_bot.datetime_utils import combine_copenhagen
 from puregym_bot.formatting import format_telegram_booking, format_telegram_class_summary
 from puregym_mcp.puregym.client import PureGymClient
 from puregym_mcp.puregym.schemas import DashboardBooking
@@ -43,9 +44,7 @@ class ActionableBooking:
 
 
 def option_datetime(option: dict) -> datetime:
-    class_date = datetime.fromisoformat(option["date"]).date()
-    start_time = time.fromisoformat(option["startTime"])
-    return datetime.combine(class_date, start_time)
+    return combine_copenhagen(option["date"], option["startTime"])
 
 
 def managed_booking_label(status: BookingStatus) -> str:

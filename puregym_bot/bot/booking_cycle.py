@@ -17,6 +17,7 @@ from puregym_bot.bot.prompts import (
     message_markup,
 )
 from puregym_bot.config import TimeSlot, get_config
+from puregym_bot.datetime_utils import combine_copenhagen, copenhagen_now
 from puregym_bot.formatting import (
     format_telegram_booking,
     format_telegram_class_summary,
@@ -60,9 +61,7 @@ class StepResult:
 
 
 def class_datetime(gym_class: GymClass) -> datetime:
-    class_date = datetime.fromisoformat(gym_class.date).date()
-    start_time = time.fromisoformat(gym_class.startTime)
-    return datetime.combine(class_date, start_time)
+    return combine_copenhagen(gym_class.date, gym_class.startTime)
 
 
 def reminder_text(booking: ManagedBooking, intro: str, outro: str) -> str:
@@ -507,7 +506,7 @@ async def publish_prompts(context: ContextTypes.DEFAULT_TYPE, session, prompts: 
 
 async def run_booking_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
     config = get_config()
-    now = datetime.now()
+    now = copenhagen_now()
     client = context.bot_data.get("puregym_client")
     if client is None:
         raise ValueError("No PureGym client found")

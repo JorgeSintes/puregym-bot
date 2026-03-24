@@ -1,5 +1,7 @@
 from datetime import date, datetime, time, timedelta
 
+from puregym_bot.datetime_utils import combine_copenhagen
+
 WEEKDAY_ABBREVIATIONS = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
 
 
@@ -53,7 +55,7 @@ def format_telegram_booking(
     if class_datetime is None:
         if class_date is None or start_time is None:
             raise ValueError("Either class_datetime or both class_date and start_time must be provided")
-        class_dt = datetime.combine(_parse_date(class_date), _parse_time(start_time))
+        class_dt = combine_copenhagen(class_date, start_time)
     else:
         class_dt = _parse_datetime(class_datetime)
 
