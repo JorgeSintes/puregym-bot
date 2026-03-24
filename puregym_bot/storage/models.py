@@ -26,6 +26,8 @@ class ManagedBooking(SQLModel, table=True):
     payment_type: str
     participation_id: str | None = None
     telegram_message_id: int | None = None
+    class_title: str
+    class_location: str
 
     # Class timing (so we can reason about reminders)
     class_datetime: datetime = Field(index=True)

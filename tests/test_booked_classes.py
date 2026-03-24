@@ -86,7 +86,13 @@ def test_format_telegram_booking_uses_telegram_date_time_format():
     )
 
     assert (
-        format_telegram_booking(gym_class)
+        format_telegram_booking(
+            class_date=gym_class.date,
+            start_time=gym_class.startTime,
+            title=gym_class.title,
+            location=gym_class.location,
+            waitlist_position=gym_class.waitlist_position,
+        )
         == "Mon 23/03 09:00  Body Pump @ Main Hall | cancel by Mon 23/03 06:00"
     )
 
@@ -126,6 +132,8 @@ async def test_booked_classes_shows_managed_status_and_waitlist_position(configu
                 activity_id=1,
                 payment_type="membership",
                 participation_id="pid-accepted",
+                class_title="Bike Standard",
+                class_location="PureGym Aarhusgade",
                 class_datetime=datetime(2026, 3, 23, 9, 0),
                 status=BookingStatus.CONFIRMED,
             )
@@ -136,6 +144,8 @@ async def test_booked_classes_shows_managed_status_and_waitlist_position(configu
                 activity_id=2,
                 payment_type="membership",
                 participation_id="pid-pending",
+                class_title="Bike Power",
+                class_location="PureGym Aarhusgade",
                 class_datetime=datetime(2026, 3, 23, 16, 30),
                 status=BookingStatus.PENDING,
             )
@@ -188,6 +198,8 @@ async def test_booked_classes_hides_stale_managed_bookings(configured_jobs, test
                 activity_id=1,
                 payment_type="membership",
                 participation_id="pid-managed",
+                class_title="Bike Standard",
+                class_location="PureGym Aarhusgade",
                 class_datetime=datetime(2026, 3, 23, 9, 0),
                 status=BookingStatus.PENDING,
             )
@@ -219,6 +231,8 @@ async def test_booked_classes_returns_no_upcoming_bookings_when_live_list_is_emp
                 activity_id=1,
                 payment_type="membership",
                 participation_id="pid-stale",
+                class_title="Stale Class",
+                class_location="PureGym Aarhusgade",
                 class_datetime=datetime(2026, 3, 23, 9, 0),
                 status=BookingStatus.PENDING,
             )
@@ -257,6 +271,8 @@ async def test_booked_classes_splits_long_output_into_multiple_messages(configur
                     activity_id=idx,
                     payment_type="membership",
                     participation_id=participation_id,
+                    class_title=f"Very Long Class Name {idx} {'X' * 40}",
+                    class_location=f"PureGym Aarhusgade {'Y' * 30}",
                     class_datetime=datetime(2026, 3, 23, 9 + (idx % 10), idx % 60),
                     status=BookingStatus.PENDING,
                 )
@@ -324,6 +340,8 @@ async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_exte
                 activity_id=1,
                 payment_type="membership",
                 participation_id="pid-pending",
+                class_title="Bike Standard",
+                class_location="PureGym Aarhusgade",
                 class_datetime=datetime(2026, 3, 23, 9, 0),
                 status=BookingStatus.PENDING,
             )
@@ -334,6 +352,8 @@ async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_exte
                 activity_id=2,
                 payment_type="membership",
                 participation_id="pid-confirmed",
+                class_title="Yoga Flow",
+                class_location="PureGym Aarhusgade",
                 class_datetime=datetime(2026, 3, 23, 12, 0),
                 status=BookingStatus.CONFIRMED,
             )

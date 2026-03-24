@@ -70,10 +70,10 @@ def build_cancel_booking_prompt(participation_id: str, text: str) -> MessageSpec
     )
 
 
-def build_confirmed_reminder_prompt(participation_id: str) -> MessageSpec:
+def build_confirmed_reminder_prompt(participation_id: str, text: str) -> MessageSpec:
     prompt = build_cancel_booking_prompt(
         participation_id,
-        text="Reminder: your class is coming up soon. If you changed your mind, cancel now.",
+        text=text,
     )
     return MessageSpec(
         text=prompt.text,

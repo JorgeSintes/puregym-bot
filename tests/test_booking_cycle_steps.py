@@ -34,6 +34,8 @@ def test_reconcile_bookings_missing_in_puregym(configured_jobs, test_engine):
             activity_id=1,
             payment_type="membership",
             participation_id="pid-past",
+            class_title="Past Class",
+            class_location="Studio 1",
             class_datetime=now - timedelta(hours=1),
             status=BookingStatus.CONFIRMED,
         )
@@ -42,6 +44,8 @@ def test_reconcile_bookings_missing_in_puregym(configured_jobs, test_engine):
             activity_id=2,
             payment_type="membership",
             participation_id="pid-future",
+            class_title="Future Class",
+            class_location="Studio 2",
             class_datetime=now + timedelta(hours=2),
             status=BookingStatus.PENDING,
         )
@@ -111,6 +115,8 @@ def test_detect_booking_state_mismatch_warns_and_prompts(configured_jobs, test_e
                 activity_id=13,
                 payment_type="membership",
                 participation_id="pid-db",
+                class_title="DB Class",
+                class_location="Studio 3",
                 class_datetime=now + timedelta(hours=2),
                 status=BookingStatus.PENDING,
             )
@@ -145,6 +151,8 @@ def test_detect_booking_state_mismatch_is_silent_when_sets_match(configured_jobs
                 activity_id=14,
                 payment_type="membership",
                 participation_id="pid-match",
+                class_title="Matched Class",
+                class_location="Studio 4",
                 class_datetime=now + timedelta(hours=2),
                 status=BookingStatus.PENDING,
             )
@@ -246,6 +254,8 @@ async def test_handle_slot_booking_actions_skips_handled_slot(configured_jobs, t
                 activity_id=25,
                 payment_type="membership",
                 participation_id="pid-existing",
+                class_title="Existing Class",
+                class_location="Studio 5",
                 class_datetime=datetime(2026, 3, 23, 18, 30),
                 status=status,
             )
@@ -313,6 +323,8 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
             activity_id=31,
             payment_type="membership",
             participation_id="pid-pending",
+            class_title="Body Pump",
+            class_location="Main Hall",
             class_datetime=now + timedelta(hours=2),
             status=BookingStatus.PENDING,
             reminder_sent=False,
@@ -322,6 +334,8 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
             activity_id=32,
             payment_type="membership",
             participation_id="pid-confirmed",
+            class_title="Yin Yoga",
+            class_location="Studio 2",
             class_datetime=now + timedelta(hours=2),
             status=BookingStatus.CONFIRMED,
             reminder_sent=False,
@@ -352,6 +366,25 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
             ).to_callback_data()
             in callbacks
         )
+        texts = [prompt.message.text for prompt in first.prompts]
+        assert any(
+            text
+            == (
+                "Reminder: you have a pending booking coming up.\n"
+                "Fri 20/03 20:00  Body Pump @ Main Hall\n"
+                "Do you want to keep it?"
+            )
+            for text in texts
+        )
+        assert any(
+            text
+            == (
+                "Reminder: your class is coming up soon.\n"
+                "Fri 20/03 20:00  Yin Yoga @ Studio 2\n"
+                "If you changed your mind, cancel now."
+            )
+            for text in texts
+        )
 
         refreshed_pending = session.get(ManagedBooking, pending.id)
         refreshed_confirmed = session.get(ManagedBooking, confirmed.id)
@@ -372,6 +405,8 @@ async def test_auto_cancel_stale_pending_bookings(configured_jobs, test_engine):
         activity_id=41,
         payment_type="membership",
         participation_id="pid-stale",
+        class_title="Stale Class",
+        class_location="Studio 6",
         class_datetime=now + timedelta(hours=2),
         status=BookingStatus.PENDING,
     )
@@ -380,6 +415,8 @@ async def test_auto_cancel_stale_pending_bookings(configured_jobs, test_engine):
         activity_id=42,
         payment_type="membership",
         participation_id="pid-future",
+        class_title="Future Class",
+        class_location="Studio 7",
         class_datetime=now + timedelta(hours=8),
         status=BookingStatus.PENDING,
     )

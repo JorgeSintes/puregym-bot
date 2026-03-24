@@ -47,6 +47,8 @@ async def test_button_accept_callback_confirms_pending_booking(
             activity_id=1,
             payment_type="membership",
             participation_id="pid-1",
+            class_title="Body Pump",
+            class_location="Main Hall",
             class_datetime=datetime(2026, 3, 23, 18, 0),
             status=BookingStatus.PENDING,
         )
@@ -83,6 +85,8 @@ async def test_button_cancel_callback_unbooks_and_cancels_booking(
             activity_id=2,
             payment_type="membership",
             participation_id="pid-2",
+            class_title="Yin Yoga",
+            class_location="Studio 2",
             class_datetime=datetime(2026, 3, 23, 18, 0),
             status=BookingStatus.CONFIRMED,
         )

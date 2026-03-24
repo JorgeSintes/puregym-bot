@@ -21,7 +21,7 @@ from puregym_bot.bot.prompts import (
     message_markup,
 )
 from puregym_bot.config import get_config
-from puregym_bot.formatting import format_telegram_booking, format_telegram_class_time
+from puregym_bot.formatting import format_telegram_booking, format_telegram_class_summary
 from puregym_mcp.puregym.client import PureGymClient
 from puregym_mcp.puregym.schemas import DashboardBooking
 from puregym_bot.storage.db import get_db_session
@@ -61,10 +61,7 @@ def booking_state_label(managed_booking: ManagedBooking | None) -> str:
 
 
 def format_booking_line(booking: DashboardBooking, state: str) -> str:
-    line = (
-        f"- {format_telegram_class_time(booking.date, booking.startTime)}  "
-        f"{booking.title} @ {booking.location} - {state}"
-    )
+    line = f"- {format_telegram_class_summary(booking.date, booking.startTime, booking.title, booking.location)} - {state}"
     if booking.waitlist_position is not None:
         return f"{line}, waitlist #{booking.waitlist_position}"
     return line
@@ -301,6 +298,8 @@ async def handle_choice_pick_callback(
             activity_id=selected["activity_id"],
             payment_type=selected["payment_type"],
             participation_id=participation_id,
+            class_title=selected["title"],
+            class_location=selected["location"],
             class_datetime=option_datetime(selected),
             status=BookingStatus.PENDING,
         )
@@ -361,25 +360,29 @@ def build_actionable_bookings(
 def build_manage_booking_prompt(actionable_booking: ActionableBooking):
     booking = actionable_booking.booking
     participation_id = booking.participationId
+    booking_text = format_telegram_booking(
+        class_date=booking.date,
+        start_time=booking.startTime,
+        title=booking.title,
+        location=booking.location,
+        waitlist_position=booking.waitlist_position,
+    )
 
     if actionable_booking.managed_booking is None:
         return build_cancel_booking_prompt(
             participation_id,
-            text=f"External booking:\n{format_telegram_booking(booking)}\nCancel it if you no longer want it.",
+            text=f"External booking:\n{booking_text}\nCancel it if you no longer want it.",
         )
 
     if actionable_booking.managed_booking.status == BookingStatus.PENDING:
         return build_keep_booking_prompt(
             participation_id,
-            text=(
-                f"Pending booking:\n{format_telegram_booking(booking)}\n"
-                "Accept to keep it or reject to cancel it."
-            ),
+            text=(f"Pending booking:\n{booking_text}\nAccept to keep it or reject to cancel it."),
         )
 
     return build_cancel_booking_prompt(
         participation_id,
-        text=f"Confirmed booking:\n{format_telegram_booking(booking)}\nCancel it if you no longer want it.",
+        text=f"Confirmed booking:\n{booking_text}\nCancel it if you no longer want it.",
     )
 
 

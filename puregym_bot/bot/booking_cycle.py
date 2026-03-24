@@ -3,6 +3,9 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
 
+from puregym_mcp.puregym.client import PureGymClient
+from puregym_mcp.puregym.filters import filter_by_booked, filter_by_time_slots
+from puregym_mcp.puregym.schemas import GymClass
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.prompts import (
@@ -15,13 +18,10 @@ from puregym_bot.bot.prompts import (
 )
 from puregym_bot.config import TimeSlot, get_config
 from puregym_bot.formatting import (
-    format_telegram_class_summary,
     format_telegram_booking,
+    format_telegram_class_summary,
     format_telegram_time,
 )
-from puregym_mcp.puregym.client import PureGymClient
-from puregym_mcp.puregym.filters import filter_by_booked, filter_by_time_slots
-from puregym_mcp.puregym.schemas import GymClass
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingChoice, BookingStatus, ManagedBooking
 from puregym_bot.storage.repository import (
@@ -63,6 +63,16 @@ def class_datetime(gym_class: GymClass) -> datetime:
     class_date = datetime.fromisoformat(gym_class.date).date()
     start_time = time.fromisoformat(gym_class.startTime)
     return datetime.combine(class_date, start_time)
+
+
+def reminder_text(booking: ManagedBooking, intro: str, outro: str) -> str:
+    summary = format_telegram_booking(
+        class_datetime=booking.class_datetime,
+        title=booking.class_title,
+        location=booking.class_location,
+        include_cancel_deadline=False,
+    )
+    return f"{intro}\n{summary}\n{outro}"
 
 
 def get_matching_slot_occurrence(gym_class: GymClass, time_slots: list[TimeSlot]) -> SlotOccurrence | None:
@@ -167,6 +177,8 @@ def import_untracked_bookings(
             activity_id=gym_class.activityId,
             payment_type=gym_class.payment_type,
             participation_id=participation_id,
+            class_title=gym_class.title,
+            class_location=gym_class.location,
             class_datetime=class_datetime(gym_class),
             status=BookingStatus.PENDING,
         )
@@ -306,6 +318,8 @@ async def handle_slot_booking_actions(
                 activity_id=gym_class.activityId,
                 payment_type=gym_class.payment_type,
                 participation_id=participation_id,
+                class_title=gym_class.title,
+                class_location=gym_class.location,
                 class_datetime=class_datetime(gym_class),
                 status=BookingStatus.PENDING,
             )
@@ -315,7 +329,19 @@ async def handle_slot_booking_actions(
 
             message = build_keep_booking_prompt(
                 participation_id,
-                text=f"Booked: {format_telegram_booking(gym_class)}\nDo you want to keep it?",
+                text=(
+                    "Booked: "
+                    f"{
+                        format_telegram_booking(
+                            class_date=gym_class.date,
+                            start_time=gym_class.startTime,
+                            title=gym_class.title,
+                            location=gym_class.location,
+                            waitlist_position=gym_class.waitlist_position,
+                        )
+                    }\n"
+                    "Do you want to keep it?"
+                ),
             )
             result.prompts.append(OutboundPrompt(booking=booking, message=message))
             continue
@@ -392,7 +418,11 @@ def send_due_reminders(session, now: datetime, reminder_hours: int) -> StepResul
                     booking=booking,
                     message=build_keep_booking_prompt(
                         booking.participation_id,
-                        text=("Reminder: you have a pending booking coming up."),
+                        text=reminder_text(
+                            booking,
+                            intro="Reminder: you have a pending booking coming up.",
+                            outro="Do you want to keep it?",
+                        ),
                     ),
                 )
             )
@@ -403,7 +433,14 @@ def send_due_reminders(session, now: datetime, reminder_hours: int) -> StepResul
             result.prompts.append(
                 OutboundPrompt(
                     booking=booking,
-                    message=build_confirmed_reminder_prompt(booking.participation_id),
+                    message=build_confirmed_reminder_prompt(
+                        booking.participation_id,
+                        text=reminder_text(
+                            booking,
+                            intro="Reminder: your class is coming up soon.",
+                            outro="If you changed your mind, cancel now.",
+                        ),
+                    ),
                 )
             )
             set_reminder_sent(session, booking)
@@ -480,7 +517,7 @@ async def run_booking_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
             logging.info("Booking cycle skipped because bot is inactive")
             return
 
-    logging.info("Running booking cycle")
+    logging.info("Running booking cycle: {%s}", now.isoformat())
     classes = await fetch_candidate_classes(client, now)
     booked_classes = filter_by_booked(classes)
     booked_by_participation = {item.participationId: item for item in booked_classes if item.participationId}
