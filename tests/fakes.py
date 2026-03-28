@@ -1,7 +1,7 @@
 from dataclasses import dataclass
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 
-from puregym_mcp.puregym.schemas import DashboardBooking, GymClass
+from puregym_mcp.puregym.models import GymClass
 
 
 def make_gym_class(
@@ -17,25 +17,29 @@ def make_gym_class(
     center_name: str = "Center 1",
     payment_type: str = "membership",
     button: dict | None = None,
+    waitlist_position: int | None = None,
+    waitlist_size: int | None = None,
 ) -> GymClass:
     return GymClass.model_validate(
         {
             "date": day.isoformat(),
-            "startTime": start.isoformat(),
-            "endTime": end.isoformat(),
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
             "title": title,
-            "activityId": activity_id,
-            "bookingId": booking_id,
+            "activity_id": activity_id,
+            "booking_id": booking_id,
             "payment_type": payment_type,
-            "participationId": participation_id,
+            "participation_id": participation_id,
             "instructor": "Coach",
             "location": location,
-            "centerName": center_name,
-            "centerUrl": "https://example.com/center",
+            "center_name": center_name,
+            "center_url": "https://example.com/center",
             "duration": 60,
-            "activityUrl": "https://example.com/activity",
-            "level": {},
+            "activity_url": "https://example.com/activity",
+            "level": None,
             "button": button or {},
+            "waitlist_position": waitlist_position,
+            "waitlist_size": waitlist_size,
         }
     )
 
@@ -49,15 +53,25 @@ def make_dashboard_booking(
     location: str = "Main Hall",
     center_name: str = "Center 1",
     button_description: str | None = None,
-) -> DashboardBooking:
-    return DashboardBooking(
-        date=day.isoformat(),
-        startTime=start.isoformat(),
-        title=title,
-        location=location,
-        centerName=center_name,
-        participationId=participation_id,
-        button_description=button_description,
+) -> GymClass:
+    return GymClass.model_validate(
+        {
+            "date": day.isoformat(),
+            "start_time": start.isoformat(),
+            "end_time": (datetime.combine(day, start) + timedelta(minutes=60)).time().isoformat(),
+            "title": title,
+            "activity_id": 1,
+            "booking_id": f"booking-{participation_id}",
+            "payment_type": "membership",
+            "participation_id": participation_id,
+            "instructor": "Coach",
+            "location": location,
+            "center_name": center_name,
+            "center_url": "https://example.com/center",
+            "duration": 60,
+            "activity_url": "https://example.com/activity",
+            "level": None,
+        }
     )
 
 
@@ -105,12 +119,12 @@ class FakePureGymClient:
         return self.bookings
 
     async def book_class(self, gym_class: GymClass):
-        self.book_calls.append(gym_class.bookingId)
-        return {"status": "success", "participationId": f"p-{gym_class.bookingId}"}
+        self.book_calls.append(gym_class.booking_id)
+        return {"status": "success", "participation_id": f"p-{gym_class.booking_id}"}
 
     async def book_by_ids(self, booking_id: str, activity_id: int, payment_type: str):
         self.book_by_ids_calls.append((booking_id, activity_id, payment_type))
-        return {"status": "success", "participationId": f"p-{booking_id}"}
+        return {"status": "success", "participation_id": f"p-{booking_id}"}
 
     async def unbook_participation(self, participation_id: str):
         self.unbook_calls.append(participation_id)

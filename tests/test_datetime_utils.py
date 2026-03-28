@@ -2,7 +2,7 @@ from datetime import datetime
 
 from puregym_bot.bot.booking_cycle import class_datetime
 from puregym_bot.datetime_utils import APP_TIMEZONE, combine_copenhagen, copenhagen_now
-from puregym_mcp.puregym.schemas import GymClass
+from puregym_mcp.puregym.models import GymClass
 
 
 def test_copenhagen_now_returns_naive_local_datetime() -> None:
@@ -22,20 +22,20 @@ def test_class_datetime_keeps_puregym_local_time() -> None:
     gym_class = GymClass.model_validate(
         {
             "date": "2026-03-23",
-            "startTime": "18:30:00",
-            "endTime": "19:30:00",
+            "start_time": "18:30:00",
+            "end_time": "19:30:00",
             "title": "Yoga",
-            "activityId": 1,
-            "bookingId": "booking-1",
+            "activity_id": 1,
+            "booking_id": "booking-1",
             "payment_type": "free",
-            "participationId": None,
+            "participation_id": None,
             "instructor": "Instructor",
             "location": "Studio",
-            "centerName": "Center",
-            "centerUrl": "/center",
+            "center_name": "Center",
+            "center_url": "/center",
             "duration": 60,
-            "activityUrl": "/activity",
-            "level": {},
+            "activity_url": "/activity",
+            "level": None,
             "button": {},
         }
     )

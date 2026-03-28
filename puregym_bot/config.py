@@ -1,7 +1,7 @@
-from pathlib import Path
 from datetime import time
 from enum import IntEnum
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, Field, SecretStr, model_validator
@@ -11,7 +11,6 @@ from pydantic_settings import (
     SettingsConfigDict,
     YamlConfigSettingsSource,
 )
-
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = PROJECT_ROOT / "config.yaml"

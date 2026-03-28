@@ -5,7 +5,7 @@ from datetime import datetime, time, timedelta
 
 from puregym_mcp.puregym.client import PureGymClient
 from puregym_mcp.puregym.filters import filter_by_booked, filter_by_time_slots
-from puregym_mcp.puregym.schemas import GymClass
+from puregym_mcp.puregym.models import GymClass
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.prompts import (
@@ -61,7 +61,7 @@ class StepResult:
 
 
 def class_datetime(gym_class: GymClass) -> datetime:
-    return combine_copenhagen(gym_class.date, gym_class.startTime)
+    return combine_copenhagen(gym_class.date, gym_class.start_time)
 
 
 def reminder_text(booking: ManagedBooking, intro: str, outro: str) -> str:
@@ -77,8 +77,8 @@ def reminder_text(booking: ManagedBooking, intro: str, outro: str) -> str:
 def get_matching_slot_occurrence(gym_class: GymClass, time_slots: list[TimeSlot]) -> SlotOccurrence | None:
     class_date = datetime.fromisoformat(gym_class.date).date()
     weekday = class_date.weekday()
-    class_start = time.fromisoformat(gym_class.startTime)
-    class_end = time.fromisoformat(gym_class.endTime)
+    class_start = time.fromisoformat(gym_class.start_time)
+    class_end = time.fromisoformat(gym_class.end_time)
 
     for slot in time_slots:
         if slot.day_of_week != weekday:
@@ -172,8 +172,8 @@ def import_untracked_bookings(
             continue
 
         booking = ManagedBooking(
-            booking_id=gym_class.bookingId,
-            activity_id=gym_class.activityId,
+            booking_id=gym_class.booking_id,
+            activity_id=gym_class.activity_id,
             payment_type=gym_class.payment_type,
             participation_id=participation_id,
             class_title=gym_class.title,
@@ -186,7 +186,7 @@ def import_untracked_bookings(
 
         text = (
             "Found a booking not tracked by the bot:\n"
-            f"- {format_telegram_class_summary(gym_class.date, gym_class.startTime, gym_class.title, gym_class.location)}\n"
+            f"- {format_telegram_class_summary(gym_class.date, gym_class.start_time, gym_class.title, gym_class.location)}\n"
             "Do you want to keep it?"
         )
         result.prompts.append(
@@ -252,11 +252,11 @@ def assert_not_booked_in_slot_by_this_point(
     slot_occurrence: SlotOccurrence,
     slot_classes: list[GymClass],
 ) -> bool:
-    booked_in_slot = [gym_class for gym_class in slot_classes if gym_class.participationId is not None]
+    booked_in_slot = [gym_class for gym_class in slot_classes if gym_class.participation_id is not None]
     if not booked_in_slot:
         return True
 
-    booking_ids = ", ".join(sorted(gym_class.bookingId for gym_class in booked_in_slot))
+    booking_ids = ", ".join(sorted(gym_class.booking_id for gym_class in booked_in_slot))
     logging.warning(
         "Skipping slot %s %s-%s because booked classes were found without a blocking DB record: %s",
         slot_occurrence.date,
@@ -291,30 +291,34 @@ async def handle_slot_booking_actions(
         if not assert_not_booked_in_slot_by_this_point(slot_occurrence, slot_classes):
             continue
 
-        available = [gym_class for gym_class in slot_classes if gym_class.participationId is None]
+        available = [gym_class for gym_class in slot_classes if gym_class.participation_id is None]
         if not available:
             continue
 
         if len(available) == 1:
             gym_class = available[0]
-            logging.info("Attempting to book class %s", gym_class.bookingId)
-            response = await client.book_class(gym_class)
+            logging.info("Attempting to book class %s", gym_class.booking_id)
+            response = await client.book_by_ids(
+                gym_class.booking_id,
+                gym_class.activity_id,
+                gym_class.payment_type,
+            )
             if response.get("status") != "success":
-                logging.info("Booking failed for %s: %s", gym_class.bookingId, response)
+                logging.info("Booking failed for %s: %s", gym_class.booking_id, response)
                 continue
 
-            participation_id = response.get("participationId")
+            participation_id = response.get("participation_id")
             if not participation_id:
                 logging.info(
-                    "Booking response missing participationId for %s: %s",
-                    gym_class.bookingId,
+                    "Booking response missing participation_id for %s: %s",
+                    gym_class.booking_id,
                     response,
                 )
                 continue
 
             booking = ManagedBooking(
-                booking_id=gym_class.bookingId,
-                activity_id=gym_class.activityId,
+                booking_id=gym_class.booking_id,
+                activity_id=gym_class.activity_id,
                 payment_type=gym_class.payment_type,
                 participation_id=participation_id,
                 class_title=gym_class.title,
@@ -333,7 +337,7 @@ async def handle_slot_booking_actions(
                     f"{
                         format_telegram_booking(
                             class_date=gym_class.date,
-                            start_time=gym_class.startTime,
+                            start_time=gym_class.start_time,
                             title=gym_class.title,
                             location=gym_class.location,
                             waitlist_position=gym_class.waitlist_position,
@@ -349,12 +353,12 @@ async def handle_slot_booking_actions(
         for gym_class in sorted(available, key=class_datetime):
             options.append(
                 {
-                    "booking_id": gym_class.bookingId,
-                    "activity_id": gym_class.activityId,
+                    "booking_id": gym_class.booking_id,
+                    "activity_id": gym_class.activity_id,
                     "payment_type": gym_class.payment_type,
                     "title": gym_class.title,
                     "date": gym_class.date,
-                    "startTime": gym_class.startTime,
+                    "startTime": gym_class.start_time,
                     "location": gym_class.location,
                 }
             )
@@ -519,7 +523,9 @@ async def run_booking_cycle(context: ContextTypes.DEFAULT_TYPE) -> None:
     logging.info("Running booking cycle: {%s}", now.isoformat())
     classes = await fetch_candidate_classes(client, now)
     booked_classes = filter_by_booked(classes)
-    booked_by_participation = {item.participationId: item for item in booked_classes if item.participationId}
+    booked_by_participation = {
+        item.participation_id: item for item in booked_classes if item.participation_id
+    }
     grouped = group_by_slot(classes, config.class_preferences.available_time_slots)
 
     with get_db_session() as session:

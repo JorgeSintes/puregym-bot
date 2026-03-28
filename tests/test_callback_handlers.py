@@ -125,7 +125,7 @@ async def test_button_pick_callback_books_selection_and_sends_follow_up_prompt(
             slot_end="22:00:00",
             options_json=(
                 '[{"booking_id": "b-3", "activity_id": 3, "payment_type": "membership", '
-                '"title": "Body Pump", "date": "2026-03-23", "startTime": "18:00:00", '
+                '"title": "Body Pump", "date": "2026-03-23", "start_time": "18:00:00", '
                 '"location": "Main Hall"}]'
             ),
         )

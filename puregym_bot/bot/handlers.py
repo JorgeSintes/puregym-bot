@@ -3,6 +3,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from puregym_mcp.puregym.client import PureGymClient
+from puregym_mcp.puregym.models import GymClass
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -23,8 +25,6 @@ from puregym_bot.bot.prompts import (
 from puregym_bot.config import get_config
 from puregym_bot.datetime_utils import combine_copenhagen
 from puregym_bot.formatting import format_telegram_booking, format_telegram_class_summary
-from puregym_mcp.puregym.client import PureGymClient
-from puregym_mcp.puregym.schemas import DashboardBooking
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
 from puregym_bot.storage.repository import (
@@ -39,12 +39,12 @@ from puregym_bot.storage.repository import (
 
 @dataclass(frozen=True)
 class ActionableBooking:
-    booking: DashboardBooking
+    booking: GymClass
     managed_booking: ManagedBooking | None
 
 
 def option_datetime(option: dict) -> datetime:
-    return combine_copenhagen(option["date"], option["startTime"])
+    return combine_copenhagen(option["date"], option["start_time"])
 
 
 def managed_booking_label(status: BookingStatus) -> str:
@@ -59,8 +59,8 @@ def booking_state_label(managed_booking: ManagedBooking | None) -> str:
     return managed_booking_label(managed_booking.status)
 
 
-def format_booking_line(booking: DashboardBooking, state: str) -> str:
-    line = f"- {format_telegram_class_summary(booking.date, booking.startTime, booking.title, booking.location)} - {state}"
+def format_booking_line(booking: GymClass, state: str) -> str:
+    line = f"- {format_telegram_class_summary(booking.date, booking.start_time, booking.title, booking.location)} - {state}"
     if booking.waitlist_position is not None:
         return f"{line}, waitlist #{booking.waitlist_position}"
     return line
@@ -285,7 +285,7 @@ async def handle_choice_pick_callback(
             await query.edit_message_text(text="Failed to book that option. Please choose another.")
             return
 
-        participation_id = resp.get("participationId")
+        participation_id = resp.get("participation_id")
         if not participation_id:
             await query.edit_message_text(
                 text="Booking succeeded but response was incomplete. Please try again."
@@ -309,7 +309,7 @@ async def handle_choice_pick_callback(
         follow_up_message = build_selected_choice_confirmation_prompt(
             title=selected["title"],
             class_date=selected["date"],
-            start_time=selected["startTime"],
+            start_time=selected["start_time"],
             location=selected["location"],
             participation_id=participation_id,
         )
@@ -321,7 +321,7 @@ async def handle_choice_pick_callback(
         )
 
 
-async def get_live_bookings(ctx: HandlerContext) -> list[DashboardBooking]:
+async def get_live_bookings(ctx: HandlerContext) -> list[GymClass]:
     return await ctx.client.get_my_bookings()
 
 
@@ -334,18 +334,20 @@ def build_managed_booking_lookup(active_bookings: list[ManagedBooking]) -> dict[
 
 
 def get_managed_booking(
-    booking: DashboardBooking, managed_by_participation: dict[str, ManagedBooking]
+    booking: GymClass, managed_by_participation: dict[str, ManagedBooking]
 ) -> ManagedBooking | None:
-    return managed_by_participation.get(booking.participationId)
+    if booking.participation_id is None:
+        return None
+    return managed_by_participation.get(booking.participation_id)
 
 
 def build_actionable_bookings(
-    bookings: list[DashboardBooking], active_bookings: list[ManagedBooking]
+    bookings: list[GymClass], active_bookings: list[ManagedBooking]
 ) -> list[ActionableBooking]:
     managed_by_participation = build_managed_booking_lookup(active_bookings)
     actionable: list[ActionableBooking] = []
 
-    for booking in sorted(bookings, key=lambda item: (item.date, item.startTime)):
+    for booking in sorted(bookings, key=lambda item: (item.date, item.start_time)):
         managed_booking = get_managed_booking(booking, managed_by_participation)
         if managed_booking is None or managed_booking.status in {
             BookingStatus.PENDING,
@@ -358,10 +360,13 @@ def build_actionable_bookings(
 
 def build_manage_booking_prompt(actionable_booking: ActionableBooking):
     booking = actionable_booking.booking
-    participation_id = booking.participationId
+    participation_id = booking.participation_id
+    if participation_id is None:
+        raise ValueError("Only bookings with participation ID can be managed")
+
     booking_text = format_telegram_booking(
         class_date=booking.date,
-        start_time=booking.startTime,
+        start_time=booking.start_time,
         title=booking.title,
         location=booking.location,
         waitlist_position=booking.waitlist_position,
@@ -419,7 +424,7 @@ async def booked_classes(
     active_bookings = get_active_bookings(ctx.session)
 
     managed_by_participation = build_managed_booking_lookup(active_bookings)
-    live_bookings = sorted(bookings, key=lambda booking: (booking.date, booking.startTime))
+    live_bookings = sorted(bookings, key=lambda booking: (booking.date, booking.start_time))
     lines: list[str] = []
     for booking in live_bookings:
         managed_booking = get_managed_booking(booking, managed_by_participation)

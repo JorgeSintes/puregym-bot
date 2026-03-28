@@ -645,7 +645,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "puregym-mcp", specifier = ">=0.1.0" },
+    { name = "puregym-mcp", editable = "../puregym-mcp" },
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.13.1" },
     { name = "python-telegram-bot", extras = ["job-queue"], specifier = ">=22.6" },
     { name = "sqlmodel", specifier = ">=0.0.37" },
@@ -662,17 +662,29 @@ dev = [
 
 [[package]]
 name = "puregym-mcp"
-version = "0.1.0"
-source = { registry = "https://pypi.org/simple" }
+version = "0.2.0"
+source = { editable = "../puregym-mcp" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "httpx" },
     { name = "mcp" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/50/845940ee6a64a1ed26f489a91b1b4be76e4cc764b639f5cc26b08a6ae45b/puregym_mcp-0.1.0.tar.gz", hash = "sha256:0d60e858d35f61c7732d0e2f58291ea2f52af3e3ef8bbdf409a19354c51463d9", size = 8937, upload-time = "2026-03-22T03:38:19.084Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/6c/28/47ed229f04794b6bebb492728cfc8134317a5b4aafabd4ffb6bd628d462f/puregym_mcp-0.1.0-py3-none-any.whl", hash = "sha256:a84a23ffab73dea239e5dfbddb66c9150f24bcc67fc43d7110329314125d620a", size = 12518, upload-time = "2026-03-22T03:38:17.927Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "beautifulsoup4", specifier = ">=4.14.3" },
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "mcp", specifier = ">=1.0.0" },
+    { name = "pydantic", specifier = ">=2.12.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "ipykernel", specifier = ">=7.2.0" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-asyncio", specifier = ">=1.2.0" },
+    { name = "ruff", specifier = ">=0.15.7" },
 ]
 
 [[package]]

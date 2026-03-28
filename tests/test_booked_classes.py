@@ -34,13 +34,11 @@ def test_gym_class_waitlist_helpers_parse_booked_waitlist_position():
         start=time(16, 30),
         end=time(17, 25),
         participation_id="pid-1",
-        button={"description": "Du er nr. 40 på ventelisten"},
     )
 
-    assert gym_class.button_description == "Du er nr. 40 på ventelisten"
-    assert gym_class.waitlist_position == 40
+    assert gym_class.waitlist_position is None
     assert gym_class.waitlist_size is None
-    assert gym_class.is_waitlisted is True
+    assert gym_class.is_waitlisted is False
 
 
 def test_gym_class_waitlist_helpers_parse_open_waitlist_size():
@@ -51,12 +49,11 @@ def test_gym_class_waitlist_helpers_parse_open_waitlist_size():
         start=time(17, 30),
         end=time(18, 25),
         participation_id=None,
-        button={"description": "Venteliste (21)"},
     )
 
     assert gym_class.waitlist_position is None
-    assert gym_class.waitlist_size == 21
-    assert gym_class.is_waitlisted is True
+    assert gym_class.waitlist_size is None
+    assert gym_class.is_waitlisted is False
 
 
 def test_gym_class_waitlist_helpers_ignore_missing_description():
@@ -69,7 +66,6 @@ def test_gym_class_waitlist_helpers_ignore_missing_description():
         participation_id="pid-3",
     )
 
-    assert gym_class.button_description is None
     assert gym_class.waitlist_position is None
     assert gym_class.waitlist_size is None
     assert gym_class.is_waitlisted is False
@@ -88,7 +84,7 @@ def test_format_telegram_booking_uses_telegram_date_time_format():
     assert (
         format_telegram_booking(
             class_date=gym_class.date,
-            start_time=gym_class.startTime,
+            start_time=gym_class.start_time,
             title=gym_class.title,
             location=gym_class.location,
             waitlist_position=gym_class.waitlist_position,
@@ -119,7 +115,7 @@ async def test_booked_classes_shows_managed_status_and_waitlist_position(configu
             participation_id="pid-pending",
             title="Bike Power",
             location="PureGym Aarhusgade",
-            button={"description": "Du er nr. 40 på ventelisten"},
+            waitlist_position=40,
         ),
     ]
     client = FakePureGymClient(live_classes)
@@ -185,7 +181,7 @@ async def test_booked_classes_hides_stale_managed_bookings(configured_jobs, test
             participation_id="pid-unmanaged",
             title="Yoga Flow",
             location="PureGym Aarhusgade",
-            button={"description": "Du er nr. 7 på ventelisten"},
+            waitlist_position=7,
         ),
     ]
     client = FakePureGymClient(live_classes)
