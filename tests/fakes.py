@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-from puregym_mcp.puregym.models import GymClass
+from puregym_mcp.puregym.models import BookClassResult, CancelBookingResult, GymClass
 
 
 def make_gym_class(
@@ -122,10 +122,10 @@ class FakePureGymClient:
         self.book_calls.append(gym_class.booking_id)
         return {"status": "success", "participation_id": f"p-{gym_class.booking_id}"}
 
-    async def book_by_ids(self, booking_id: str, activity_id: int, payment_type: str):
+    async def book_by_ids(self, booking_id: str, activity_id: int, payment_type: str) -> BookClassResult:
         self.book_by_ids_calls.append((booking_id, activity_id, payment_type))
-        return {"status": "success", "participation_id": f"p-{booking_id}"}
+        return BookClassResult(status="success", participation_id=f"p-{booking_id}")
 
-    async def unbook_participation(self, participation_id: str):
+    async def unbook_participation(self, participation_id: str) -> CancelBookingResult:
         self.unbook_calls.append(participation_id)
-        return {"status": "success"}
+        return CancelBookingResult(status="success")

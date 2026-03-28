@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from puregym_mcp.puregym.client import PureGymClient
-from puregym_mcp.puregym.models import GymClass
+from puregym_mcp.puregym.models import BookClassResult, CancelBookingResult, GymClass
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from puregym_bot.bot.booking_cycle import run_booking_cycle
+from puregym_bot.bot.booking_cycle import BookingChoiceOption, run_booking_cycle
 from puregym_bot.bot.callback_data import (
     BookingCallback,
     BookingCallbackAction,
@@ -43,8 +43,8 @@ class ActionableBooking:
     managed_booking: ManagedBooking | None
 
 
-def option_datetime(option: dict) -> datetime:
-    return combine_copenhagen(option["date"], option["start_time"])
+def option_datetime(option: BookingChoiceOption) -> datetime:
+    return combine_copenhagen(option.date, option.start_time)
 
 
 def managed_booking_label(status: BookingStatus) -> str:
@@ -238,7 +238,7 @@ async def cancel_booking_from_callback(
         return
 
     resp = await client.unbook_participation(participation_id)
-    if resp.get("status") == "success":
+    if resp.status == "success":
         if booking is not None:
             set_booking_status(session, booking, BookingStatus.CANCELLED)
             session.commit()
@@ -265,7 +265,8 @@ async def handle_choice_pick_callback(
             await query.edit_message_text(text="This selection has already been handled.")
             return
 
-        options = json.loads(choice.options_json)
+        raw_options = json.loads(choice.options_json)
+        options = [BookingChoiceOption.model_validate(opt) for opt in raw_options]
         if callback.option_index >= len(options):
             await query.edit_message_text(text="This action is no longer available.")
             return
@@ -276,16 +277,16 @@ async def handle_choice_pick_callback(
             return
 
         resp = await client.book_by_ids(
-            selected["booking_id"],
-            selected["activity_id"],
-            selected["payment_type"],
+            selected.booking_id,
+            selected.activity_id,
+            selected.payment_type,
         )
-        if resp.get("status") != "success":
+        if resp.status != "success":
             logging.debug("Failed to book selected option: %s", resp)
             await query.edit_message_text(text="Failed to book that option. Please choose another.")
             return
 
-        participation_id = resp.get("participation_id")
+        participation_id = resp.participation_id
         if not participation_id:
             await query.edit_message_text(
                 text="Booking succeeded but response was incomplete. Please try again."
@@ -293,12 +294,12 @@ async def handle_choice_pick_callback(
             return
 
         booking = ManagedBooking(
-            booking_id=selected["booking_id"],
-            activity_id=selected["activity_id"],
-            payment_type=selected["payment_type"],
+            booking_id=selected.booking_id,
+            activity_id=selected.activity_id,
+            payment_type=selected.payment_type,
             participation_id=participation_id,
-            class_title=selected["title"],
-            class_location=selected["location"],
+            class_title=selected.title,
+            class_location=selected.location,
             class_datetime=option_datetime(selected),
             status=BookingStatus.PENDING,
         )
@@ -307,10 +308,10 @@ async def handle_choice_pick_callback(
         session.commit()
 
         follow_up_message = build_selected_choice_confirmation_prompt(
-            title=selected["title"],
-            class_date=selected["date"],
-            start_time=selected["start_time"],
-            location=selected["location"],
+            title=selected.title,
+            class_date=selected.date,
+            start_time=selected.start_time,
+            location=selected.location,
             participation_id=participation_id,
         )
         await query.edit_message_text(text="Booked your selection. Please accept or reject.")

@@ -3,9 +3,10 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
 
+from pydantic import BaseModel
 from puregym_mcp.puregym.client import PureGymClient
 from puregym_mcp.puregym.filters import filter_by_booked, filter_by_time_slots
-from puregym_mcp.puregym.models import GymClass
+from puregym_mcp.puregym.models import BookClassResult, CancelBookingResult, GymClass
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.prompts import (
@@ -58,6 +59,18 @@ class OutboundPrompt:
 @dataclass
 class StepResult:
     prompts: list[OutboundPrompt] = field(default_factory=list)
+
+
+class BookingChoiceOption(BaseModel):
+    """Typed model for a booking choice option stored in BookingChoice.options_json."""
+
+    booking_id: str
+    activity_id: int
+    payment_type: str
+    title: str
+    date: str
+    start_time: str
+    location: str
 
 
 def class_datetime(gym_class: GymClass) -> datetime:
@@ -303,11 +316,11 @@ async def handle_slot_booking_actions(
                 gym_class.activity_id,
                 gym_class.payment_type,
             )
-            if response.get("status") != "success":
+            if response.status != "success":
                 logging.info("Booking failed for %s: %s", gym_class.booking_id, response)
                 continue
 
-            participation_id = response.get("participation_id")
+            participation_id = response.participation_id
             if not participation_id:
                 logging.info(
                     "Booking response missing participation_id for %s: %s",
@@ -349,25 +362,25 @@ async def handle_slot_booking_actions(
             result.prompts.append(OutboundPrompt(booking=booking, message=message))
             continue
 
-        options = []
+        options: list[BookingChoiceOption] = []
         for gym_class in sorted(available, key=class_datetime):
             options.append(
-                {
-                    "booking_id": gym_class.booking_id,
-                    "activity_id": gym_class.activity_id,
-                    "payment_type": gym_class.payment_type,
-                    "title": gym_class.title,
-                    "date": gym_class.date,
-                    "startTime": gym_class.start_time,
-                    "location": gym_class.location,
-                }
+                BookingChoiceOption(
+                    booking_id=gym_class.booking_id,
+                    activity_id=gym_class.activity_id,
+                    payment_type=gym_class.payment_type,
+                    title=gym_class.title,
+                    date=gym_class.date,
+                    start_time=gym_class.start_time,
+                    location=gym_class.location,
+                )
             )
 
         choice = BookingChoice(
             slot_date=slot_occurrence.date,
             slot_start=slot_occurrence.slot_start,
             slot_end=slot_occurrence.slot_end,
-            options_json=json.dumps(options),
+            options_json=json.dumps([opt.model_dump() for opt in options]),
         )
         add_booking_choice(session, choice)
         session.commit()
@@ -379,7 +392,7 @@ async def handle_slot_booking_actions(
         for idx, option in enumerate(options, start=1):
             lines.append(
                 f"{idx}. "
-                f"{format_telegram_class_summary(option['date'], option['startTime'], option['title'], option['location'])}"
+                f"{format_telegram_class_summary(option.date, option.start_time, option.title, option.location)}"
             )
 
         buttons: tuple[tuple[ButtonSpec, ...], ...] = tuple(
@@ -387,7 +400,7 @@ async def handle_slot_booking_actions(
                 build_choice_pick_button(
                     choice_id=choice_id,
                     option_index=idx,
-                    label=f"{idx + 1}. {format_telegram_time(option['startTime'])} {option['title']}",
+                    label=f"{idx + 1}. {format_telegram_time(option.start_time)} {option.title}",
                 ),
             )
             for idx, option in enumerate(options)
@@ -472,7 +485,7 @@ async def auto_cancel_stale_pending_bookings(
             continue
 
         response = await client.unbook_participation(booking.participation_id)
-        if response.get("status") != "success":
+        if response.status != "success":
             logging.info("Failed to auto-cancel booking %s: %s", booking.booking_id, response)
             continue
 

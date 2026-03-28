@@ -7,7 +7,8 @@ module-name = "puregym_bot"
 module-root = ""
 
 [tool.uv.sources]
-puregym-mcp = { path = "../puregym-mcp", editable = true }
+# puregym-mcp = { path = "../puregym-mcp", editable = true }
+puregym-mcp = { git = "https://github.com/JorgeSintes/puregym-mcp" }
 
 [project]
 name = "puregym-bot"
