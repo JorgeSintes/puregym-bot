@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from puregym_mcp.puregym.client import PureGymClient
-from puregym_mcp.puregym.models import BookClassResult, CancelBookingResult, GymClass
+from puregym_mcp.puregym.models import GymClass
 from telegram import Update
 from telegram.ext import ContextTypes
 

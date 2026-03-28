@@ -6,7 +6,7 @@ from datetime import datetime, time, timedelta
 from pydantic import BaseModel
 from puregym_mcp.puregym.client import PureGymClient
 from puregym_mcp.puregym.filters import filter_by_booked, filter_by_time_slots
-from puregym_mcp.puregym.models import BookClassResult, CancelBookingResult, GymClass
+from puregym_mcp.puregym.models import GymClass
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.prompts import (
