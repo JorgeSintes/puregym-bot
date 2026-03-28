@@ -645,7 +645,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "puregym-mcp", git = "https://github.com/JorgeSintes/puregym-mcp" },
+    { name = "puregym-mcp", specifier = ">=0.3.0" },
     { name = "pydantic-settings", extras = ["yaml"], specifier = ">=2.13.1" },
     { name = "python-telegram-bot", extras = ["job-queue"], specifier = ">=22.6" },
     { name = "sqlmodel", specifier = ">=0.0.37" },
@@ -662,13 +662,17 @@ dev = [
 
 [[package]]
 name = "puregym-mcp"
-version = "0.2.0"
-source = { git = "https://github.com/JorgeSintes/puregym-mcp#71745c7cda4efd7ef06a2a5f709f84c4e82eb240" }
+version = "0.3.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "httpx" },
     { name = "mcp" },
     { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/99/30/090d90dffe76ce4504560456958ba98d1ee04fda3a2bf5bbd7a7af5559cf/puregym_mcp-0.3.0.tar.gz", hash = "sha256:7389b2d28d1dc66062364eefda94645369b381c25fb0f80d6e8b7edbc3878d43", size = 12431, upload-time = "2026-03-28T22:01:31.904Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8f/f0/b4fda9fd9c85809003a91cad369dbe3bdc155ecfbb3e5f61a5e29e7a1cda/puregym_mcp-0.3.0-py3-none-any.whl", hash = "sha256:10d7e85972471629939ec5b905021c4c364a62383726ca8d2bc39962ec507293", size = 17216, upload-time = "2026-03-28T22:01:30.857Z" },
 ]
 
 [[package]]
