@@ -224,7 +224,7 @@ async def test_handle_slot_booking_actions_single_and_multiple(configured_jobs, 
         all_choices = list(session.exec(select(BookingChoice)).all())
         assert len(all_bookings) == 1
         assert len(all_choices) == 1
-        assert client.book_calls == ["b-single"]
+        assert client.book_by_ids_calls == [("b-single", 21, "membership")]
 
 
 @pytest.mark.asyncio

@@ -135,7 +135,7 @@ async def test_run_booking_cycle_full_chain(configured_jobs, session_factory, te
         assert manual.status == BookingStatus.CANCELLED
         assert new_single.status == BookingStatus.PENDING
 
-    assert "b-single" in client.book_calls
+    assert ("b-single", 4, "membership") in client.book_by_ids_calls
     assert "pid-pending" in client.unbook_calls
     texts = [call["text"] for call in context.bot.calls]
     assert any("Found a booking not tracked by the bot" in text for text in texts)
