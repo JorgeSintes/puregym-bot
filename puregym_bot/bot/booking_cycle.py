@@ -2,11 +2,12 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
+from typing import cast
 
-from pydantic import BaseModel
 from puregym_mcp.puregym.client import PureGymClient
-from puregym_mcp.puregym.filters import filter_by_booked, filter_by_time_slots
+from puregym_mcp.puregym.filters import TimeSlotLike, filter_by_booked, filter_by_time_slots
 from puregym_mcp.puregym.models import GymClass
+from pydantic import BaseModel
 from telegram.ext import ContextTypes
 
 from puregym_bot.bot.prompts import (
@@ -133,7 +134,9 @@ async def fetch_candidate_classes(client: PureGymClient, now: datetime) -> list[
         from_date=from_date,
         to_date=to_date,
     )
-    classes = filter_by_time_slots(classes, config.class_preferences.available_time_slots)
+    classes = filter_by_time_slots(
+        classes, cast(list[TimeSlotLike], config.class_preferences.available_time_slots)
+    )
     classes.sort(key=class_datetime)
     return classes
 
