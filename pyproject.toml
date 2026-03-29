@@ -17,7 +17,7 @@ description = "Single-user Telegram bot for PureGym automation"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "puregym-mcp>=0.3.0",
+    "puregym-mcp>=0.3.1",
     "pydantic-settings[yaml]>=2.13.1",
     "python-telegram-bot[job-queue]>=22.6",
     "sqlmodel>=0.0.37",
