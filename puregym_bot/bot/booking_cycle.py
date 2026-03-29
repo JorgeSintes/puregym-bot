@@ -193,7 +193,7 @@ def import_untracked_bookings(
             payment_type=gym_class.payment_type,
             participation_id=participation_id,
             class_title=gym_class.title,
-            class_location=gym_class.location,
+            class_location=gym_class.center_name,
             class_datetime=class_datetime(gym_class),
             status=BookingStatus.PENDING,
         )
@@ -202,7 +202,7 @@ def import_untracked_bookings(
 
         text = (
             "Found a booking not tracked by the bot:\n"
-            f"- {format_telegram_class_summary(gym_class.date, gym_class.start_time, gym_class.title, gym_class.location)}\n"
+            f"- {format_telegram_class_summary(gym_class.date, gym_class.start_time, gym_class.title, gym_class.center_name)}\n"
             "Do you want to keep it?"
         )
         result.prompts.append(
@@ -338,7 +338,7 @@ async def handle_slot_booking_actions(
                 payment_type=gym_class.payment_type,
                 participation_id=participation_id,
                 class_title=gym_class.title,
-                class_location=gym_class.location,
+                class_location=gym_class.center_name,
                 class_datetime=class_datetime(gym_class),
                 status=BookingStatus.PENDING,
             )
@@ -355,7 +355,7 @@ async def handle_slot_booking_actions(
                             class_date=gym_class.date,
                             start_time=gym_class.start_time,
                             title=gym_class.title,
-                            location=gym_class.location,
+                            location=gym_class.center_name,
                             waitlist_position=gym_class.waitlist_position,
                         )
                     }\n"
@@ -375,7 +375,7 @@ async def handle_slot_booking_actions(
                     title=gym_class.title,
                     date=gym_class.date,
                     start_time=gym_class.start_time,
-                    location=gym_class.location,
+                    location=gym_class.center_name,
                 )
             )
 

@@ -104,7 +104,7 @@ async def test_booked_classes_shows_managed_status_and_waitlist_position(configu
             end=time(9, 55),
             participation_id="pid-accepted",
             title="Bike Standard",
-            location="PureGym Aarhusgade",
+            center_name="PureGym Aarhusgade",
         ),
         make_gym_class(
             booking_id="b-pending",
@@ -114,7 +114,7 @@ async def test_booked_classes_shows_managed_status_and_waitlist_position(configu
             end=time(17, 25),
             participation_id="pid-pending",
             title="Bike Power",
-            location="PureGym Aarhusgade",
+            center_name="PureGym Aarhusgade",
             waitlist_position=40,
         ),
     ]
@@ -170,7 +170,7 @@ async def test_booked_classes_hides_stale_managed_bookings(configured_jobs, test
             end=time(9, 55),
             participation_id="pid-managed",
             title="Bike Standard",
-            location="PureGym Aarhusgade",
+            center_name="PureGym Aarhusgade",
         ),
         make_gym_class(
             booking_id="b-unmanaged",
@@ -180,7 +180,7 @@ async def test_booked_classes_hides_stale_managed_bookings(configured_jobs, test
             end=time(12, 55),
             participation_id="pid-unmanaged",
             title="Yoga Flow",
-            location="PureGym Aarhusgade",
+            center_name="PureGym Aarhusgade",
             waitlist_position=7,
         ),
     ]
@@ -303,7 +303,7 @@ async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_exte
             end=time(9, 55),
             participation_id="pid-pending",
             title="Bike Standard",
-            location="PureGym Aarhusgade",
+            center_name="PureGym Aarhusgade",
         ),
         make_gym_class(
             booking_id="b-confirmed",
@@ -313,7 +313,7 @@ async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_exte
             end=time(12, 55),
             participation_id="pid-confirmed",
             title="Yoga Flow",
-            location="PureGym Aarhusgade",
+            center_name="PureGym Aarhusgade",
         ),
         make_gym_class(
             booking_id="b-external",
@@ -323,7 +323,7 @@ async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_exte
             end=time(17, 25),
             participation_id="pid-external",
             title="Pilates",
-            location="PureGym Aarhusgade",
+            center_name="PureGym Aarhusgade",
         ),
     ]
     client = FakePureGymClient(live_classes)

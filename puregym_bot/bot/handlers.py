@@ -65,7 +65,7 @@ def booking_state_label(managed_booking: ManagedBooking | None) -> str:
 
 
 def format_booking_line(booking: GymClass, state: str) -> str:
-    line = f"- {format_telegram_class_summary(booking.date, booking.start_time, booking.title, booking.location)} - {state}"
+    line = f"- {format_telegram_class_summary(booking.date, booking.start_time, booking.title, booking.center_name)} - {state}"
     if booking.waitlist_position is not None:
         return f"{line}, waitlist #{booking.waitlist_position}"
     return line
@@ -409,7 +409,7 @@ def build_manage_booking_prompt(actionable_booking: ActionableBooking):
         class_date=booking.date,
         start_time=booking.start_time,
         title=booking.title,
-        location=booking.location,
+        location=booking.center_name,
         waitlist_position=booking.waitlist_position,
     )
 
