@@ -6,6 +6,7 @@ class BookingCallbackAction(StrEnum):
     ACCEPT = "accept"
     REJECT = "reject"
     CANCEL = "cancel"
+    REVERT_PENDING = "revert_pending"
 
 
 @dataclass(frozen=True)

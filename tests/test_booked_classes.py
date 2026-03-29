@@ -369,7 +369,7 @@ async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_exte
         (
             "Confirmed booking:\n"
             "Mon 23/03 12:00  Yoga Flow @ PureGym Aarhusgade | cancel by Mon 23/03 09:00\n"
-            "Cancel it if you no longer want it."
+            "Cancel it if you no longer want it, or revert to pending to reconsider."
         ),
         (
             "External booking:\n"
@@ -379,7 +379,7 @@ async def test_manage_bookings_sends_action_cards_for_pending_confirmed_and_exte
     ]
     assert context.bot.calls[0]["reply_markup"] is None
     assert keyboard_labels(context.bot.calls[1]) == [["Accept", "Reject"]]
-    assert keyboard_labels(context.bot.calls[2]) == [["Cancel"]]
+    assert keyboard_labels(context.bot.calls[2]) == [["Cancel", "Revert to pending"]]
     assert keyboard_labels(context.bot.calls[3]) == [["Cancel"]]
 
 

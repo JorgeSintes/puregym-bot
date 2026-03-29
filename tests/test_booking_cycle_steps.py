@@ -366,6 +366,13 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
             ).to_callback_data()
             in callbacks
         )
+        assert (
+            BookingCallback(
+                action=BookingCallbackAction.REVERT_PENDING,
+                participation_id="pid-confirmed",
+            ).to_callback_data()
+            in callbacks
+        )
         texts = [prompt.message.text for prompt in first.prompts]
         assert any(
             text
@@ -381,7 +388,7 @@ def test_send_due_reminders_pending_and_confirmed_once(configured_jobs, test_eng
             == (
                 "Reminder: your class is coming up soon.\n"
                 "Fri 20/03 20:00  Yin Yoga @ Studio 2\n"
-                "If you changed your mind, cancel now."
+                "If you changed your mind, cancel now or revert to pending to reconsider."
             )
             for text in texts
         )

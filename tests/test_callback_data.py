@@ -17,9 +17,14 @@ def test_parse_callback_data_round_trips_booking_callbacks():
         action=BookingCallbackAction.CANCEL,
         participation_id="pid-456",
     )
+    revert_pending = BookingCallback(
+        action=BookingCallbackAction.REVERT_PENDING,
+        participation_id="pid-789",
+    )
 
     assert parse_callback_data(accept.to_callback_data()) == accept
     assert parse_callback_data(cancel.to_callback_data()) == cancel
+    assert parse_callback_data(revert_pending.to_callback_data()) == revert_pending
 
 
 def test_parse_callback_data_round_trips_choice_pick_callback():

@@ -87,7 +87,7 @@ async def test_button_cancel_callback_unbooks_and_cancels_booking(
             participation_id="pid-2",
             class_title="Yin Yoga",
             class_location="Studio 2",
-            class_datetime=datetime(2026, 3, 23, 18, 0),
+            class_datetime=datetime(2099, 3, 23, 18, 0),
             status=BookingStatus.CONFIRMED,
         )
         session.add(booking)
@@ -110,6 +110,124 @@ async def test_button_cancel_callback_unbooks_and_cancels_booking(
     assert callback_query.edited_texts == ["Booking cancelled."]
     assert client.unbook_calls == ["pid-2"]
     assert refreshed.status == BookingStatus.CANCELLED
+
+
+@pytest.mark.asyncio
+async def test_button_revert_pending_callback_reverts_confirmed_to_pending(
+    configured_jobs, session_factory, test_engine, monkeypatch
+):
+    monkeypatch.setattr(handlers, "get_db_session", session_factory)
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        booking = ManagedBooking(
+            booking_id="b-3",
+            activity_id=3,
+            payment_type="membership",
+            participation_id="pid-3",
+            class_title="Spin Class",
+            class_location="Studio 1",
+            class_datetime=datetime(2099, 3, 23, 18, 0),
+            status=BookingStatus.CONFIRMED,
+            reminder_sent=True,
+        )
+        session.add(booking)
+        session.commit()
+
+    callback_query = FakeCallbackQuery(
+        BookingCallback(
+            action=BookingCallbackAction.REVERT_PENDING,
+            participation_id="pid-3",
+        ).to_callback_data()
+    )
+    context = FakeContext(FakePureGymClient([]))
+
+    await handlers.button(make_update(callback_query), cast(ContextTypes.DEFAULT_TYPE, context))
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        refreshed = session.exec(select(ManagedBooking)).one()
+
+    assert callback_query.answered is True
+    assert callback_query.edited_texts == ["Booking reverted to pending."]
+    assert refreshed.status == BookingStatus.PENDING
+    assert refreshed.reminder_sent is False
+
+
+@pytest.mark.asyncio
+async def test_button_cancel_callback_blocks_within_two_hour_window(
+    configured_jobs, session_factory, test_engine, monkeypatch
+):
+    monkeypatch.setattr(handlers, "get_db_session", session_factory)
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        booking = ManagedBooking(
+            booking_id="b-close",
+            activity_id=4,
+            payment_type="membership",
+            participation_id="pid-close",
+            class_title="Hot Yoga",
+            class_location="Studio 3",
+            class_datetime=datetime(2026, 3, 29, 12, 0),
+            status=BookingStatus.CONFIRMED,
+        )
+        session.add(booking)
+        session.commit()
+
+    client = FakePureGymClient([])
+    callback_query = FakeCallbackQuery(
+        BookingCallback(
+            action=BookingCallbackAction.CANCEL,
+            participation_id="pid-close",
+        ).to_callback_data()
+    )
+    context = FakeContext(client)
+
+    await handlers.button(make_update(callback_query), cast(ContextTypes.DEFAULT_TYPE, context))
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        refreshed = session.exec(select(ManagedBooking)).one()
+
+    assert callback_query.edited_texts == ["This booking can no longer be cancelled."]
+    assert client.unbook_calls == []
+    assert refreshed.status == BookingStatus.CONFIRMED
+
+
+@pytest.mark.asyncio
+async def test_button_revert_callback_blocks_within_two_hour_window(
+    configured_jobs, session_factory, test_engine, monkeypatch
+):
+    monkeypatch.setattr(handlers, "get_db_session", session_factory)
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        booking = ManagedBooking(
+            booking_id="b-revert-close",
+            activity_id=5,
+            payment_type="membership",
+            participation_id="pid-revert-close",
+            class_title="Pilates",
+            class_location="Studio 4",
+            class_datetime=datetime(2026, 3, 29, 12, 0),
+            status=BookingStatus.CONFIRMED,
+            reminder_sent=True,
+        )
+        session.add(booking)
+        session.commit()
+
+    callback_query = FakeCallbackQuery(
+        BookingCallback(
+            action=BookingCallbackAction.REVERT_PENDING,
+            participation_id="pid-revert-close",
+        ).to_callback_data()
+    )
+    context = FakeContext(FakePureGymClient([]))
+
+    await handlers.button(make_update(callback_query), cast(ContextTypes.DEFAULT_TYPE, context))
+
+    with Session(test_engine, expire_on_commit=False) as session:
+        refreshed = session.exec(select(ManagedBooking)).one()
+
+    assert callback_query.edited_texts == ["This booking can no longer be cancelled."]
+    assert refreshed.status == BookingStatus.CONFIRMED
+    assert refreshed.reminder_sent is True
 
 
 @pytest.mark.asyncio

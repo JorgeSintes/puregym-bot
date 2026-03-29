@@ -1,7 +1,7 @@
 import json
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from puregym_mcp.puregym.client import PureGymClient
 from puregym_mcp.puregym.models import GymClass
@@ -18,12 +18,13 @@ from puregym_bot.bot.callback_data import (
 from puregym_bot.bot.dependencies import HandlerContext
 from puregym_bot.bot.prompts import (
     build_cancel_booking_prompt,
+    build_confirmed_booking_prompt,
     build_keep_booking_prompt,
     build_selected_choice_confirmation_prompt,
     message_markup,
 )
 from puregym_bot.config import get_config
-from puregym_bot.datetime_utils import combine_copenhagen
+from puregym_bot.datetime_utils import copenhagen_now, combine_copenhagen
 from puregym_bot.formatting import format_telegram_booking, format_telegram_class_summary
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.models import BookingStatus, ChoiceStatus, ManagedBooking
@@ -45,6 +46,10 @@ class ActionableBooking:
 
 def option_datetime(option: BookingChoiceOption) -> datetime:
     return combine_copenhagen(option.date, option.start_time)
+
+
+def is_within_cancel_window(booking: ManagedBooking) -> bool:
+    return booking.class_datetime - copenhagen_now() < timedelta(hours=2)
 
 
 def managed_booking_label(status: BookingStatus) -> str:
@@ -174,6 +179,10 @@ async def button(
             await handle_booking_cancel_callback(update, context, parsed)
             return
 
+        if parsed.action == BookingCallbackAction.REVERT_PENDING:
+            await handle_booking_revert_callback(update, context, parsed)
+            return
+
         await handle_booking_decision_callback(update, context, parsed)
         return
 
@@ -222,8 +231,39 @@ async def handle_booking_cancel_callback(
         return
 
     with get_db_session() as session:
+        booking = get_booking_by_participation_id(session, callback.participation_id)
+        if booking is not None and is_within_cancel_window(booking):
+            await query.edit_message_text(text="This booking can no longer be cancelled.")
+            return
+
         client = get_puregym_client(context)
         await cancel_booking_from_callback(session, query, callback.participation_id, client)
+
+
+async def handle_booking_revert_callback(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    callback: BookingCallback,
+) -> None:
+    query = update.callback_query
+    if query is None:
+        return
+
+    with get_db_session() as session:
+        booking = get_booking_by_participation_id(session, callback.participation_id)
+        if booking is None or booking.status != BookingStatus.CONFIRMED:
+            await query.edit_message_text(text="This booking can no longer be reverted.")
+            return
+
+        if is_within_cancel_window(booking):
+            await query.edit_message_text(text="This booking can no longer be cancelled.")
+            return
+
+        set_booking_status(session, booking, BookingStatus.PENDING)
+        booking.reminder_sent = False
+        session.add(booking)
+        session.commit()
+        await query.edit_message_text(text="Booking reverted to pending.")
 
 
 async def cancel_booking_from_callback(
@@ -385,9 +425,9 @@ def build_manage_booking_prompt(actionable_booking: ActionableBooking):
             text=(f"Pending booking:\n{booking_text}\nAccept to keep it or reject to cancel it."),
         )
 
-    return build_cancel_booking_prompt(
+    return build_confirmed_booking_prompt(
         participation_id,
-        text=f"Confirmed booking:\n{booking_text}\nCancel it if you no longer want it.",
+        text=f"Confirmed booking:\n{booking_text}\nCancel it if you no longer want it, or revert to pending to reconsider.",
     )
 
 

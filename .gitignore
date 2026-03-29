@@ -6,8 +6,8 @@ dist/
 wheels/
 *.egg-info
 
-# Virtual environments
 .venv
+.vscode
 config.yaml
 debug.py
 puregym_bot.db

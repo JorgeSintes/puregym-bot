@@ -143,7 +143,7 @@ async def test_run_booking_cycle_full_chain(configured_jobs, session_factory, te
     assert not any("Multiple classes match this time slot" in text for text in texts)
     assert any(
         "Reminder: your class is coming up soon.\nMon 23/03 19:00  Body Pump @ Main Hall\n"
-        "If you changed your mind, cancel now." == text
+        "If you changed your mind, cancel now or revert to pending to reconsider." == text
         for text in texts
     )
     assert any("Pending booking was cancelled" in text for text in texts)

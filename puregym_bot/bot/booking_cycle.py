@@ -13,7 +13,7 @@ from puregym_bot.bot.prompts import (
     ButtonSpec,
     MessageSpec,
     build_choice_pick_button,
-    build_confirmed_reminder_prompt,
+    build_confirmed_booking_prompt,
     build_keep_booking_prompt,
     message_markup,
 )
@@ -449,12 +449,12 @@ def send_due_reminders(session, now: datetime, reminder_hours: int) -> StepResul
             result.prompts.append(
                 OutboundPrompt(
                     booking=booking,
-                    message=build_confirmed_reminder_prompt(
+                    message=build_confirmed_booking_prompt(
                         booking.participation_id,
                         text=reminder_text(
                             booking,
                             intro="Reminder: your class is coming up soon.",
-                            outro="If you changed your mind, cancel now.",
+                            outro="If you changed your mind, cancel now or revert to pending to reconsider.",
                         ),
                     ),
                 )

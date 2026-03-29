@@ -70,14 +70,27 @@ def build_cancel_booking_prompt(participation_id: str, text: str) -> MessageSpec
     )
 
 
-def build_confirmed_reminder_prompt(participation_id: str, text: str) -> MessageSpec:
-    prompt = build_cancel_booking_prompt(
-        participation_id,
-        text=text,
-    )
+def build_confirmed_booking_prompt(participation_id: str, text: str) -> MessageSpec:
     return MessageSpec(
-        text=prompt.text,
-        buttons=((ButtonSpec(label="Cancel now", callback_data=prompt.buttons[0][0].callback_data),),),
+        text=text,
+        buttons=(
+            (
+                ButtonSpec(
+                    label="Cancel",
+                    callback_data=BookingCallback(
+                        action=BookingCallbackAction.CANCEL,
+                        participation_id=participation_id,
+                    ).to_callback_data(),
+                ),
+                ButtonSpec(
+                    label="Revert to pending",
+                    callback_data=BookingCallback(
+                        action=BookingCallbackAction.REVERT_PENDING,
+                        participation_id=participation_id,
+                    ).to_callback_data(),
+                ),
+            ),
+        ),
     )
 
 
