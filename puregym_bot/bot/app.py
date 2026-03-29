@@ -22,6 +22,7 @@ def build_app():
     application = (
         ApplicationBuilder()
         .token(config.telegram_token.get_secret_value())
+        .connect_timeout(config.telegram_timeout_seconds)
         .post_init(post_init)
         .post_shutdown(on_shutdown)
         .build()

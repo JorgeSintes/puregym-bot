@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from typing import Awaitable, Callable, cast
 
+from puregym_mcp.puregym.client import PureGymClient
 from sqlmodel import Session
 from telegram import Update
 from telegram.ext import ContextTypes
 
 from puregym_bot.config import get_config
-from puregym_mcp.puregym.client import PureGymClient
 from puregym_bot.storage.db import get_db_session
 from puregym_bot.storage.repository import get_bot_state
 
@@ -23,6 +23,7 @@ async def on_startup(app):
     app.bot_data["puregym_client"] = PureGymClient(
         config.puregym_username,
         config.puregym_password.get_secret_value(),
+        config.puregym_timeout_seconds,
     )
     with get_db_session() as session:
         bot_state = get_bot_state(session)

@@ -88,6 +88,8 @@ class Config(BaseSettings):
     booking_reminder_hours: int = 24
     pending_auto_cancel_hours: int = 3
     booking_interval_seconds: int = 60
+    telegram_timeout_seconds: float = 10.0
+    puregym_timeout_seconds: float = 10.0
 
     model_config = SettingsConfigDict(yaml_file=str(CONFIG_PATH), yaml_file_encoding="utf-8")
 
