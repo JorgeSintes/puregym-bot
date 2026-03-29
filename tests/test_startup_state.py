@@ -10,9 +10,10 @@ from puregym_bot.storage.repository import get_bot_state
 
 
 class FakeClient:
-    def __init__(self, username: str, password: str):
+    def __init__(self, username: str, password: str, timeout: float):
         self.username = username
         self.password = password
+        self.timeout = timeout
 
 
 class RecordingBot:
